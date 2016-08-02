@@ -45,3 +45,23 @@ all other dependencies follow by:
 sudo apt-get install cython python python-dev python-pip python-scipy
 sudo pip install pycddlib quadprog
 ```
+
+## Usage
+
+There are three scripts you can run:
+
+- [staircase/walk.py](/staircase/walk.py) walks the humanoid model around a
+  circular staircase with tilted stepping stones. Supporting contact forces are
+  computed at each time instant: in case of failure, the skyblue background
+  becomes red. When supporting forces are found again, the red background takes
+  a "tainted" color between red and blue.
+- [static\_equilibrium/comparison.py](/static_equilibrium/comparison.py)
+  compares computation times for four different algorithms computing the
+  static-equilibrium polygon.
+- [static\_equilibrium/figure-2.py](/static_equilibrium/figure-2.py) generates
+  Figure 2 from the paper.
+
+Due to the copyright problem, we cannot release the COLLADA model ``HRP4R.dae``
+used to produce the accompanying video. We have replaced it with the
+[JVRC-1](https://github.com/stephane-caron/openrave_models/tree/master/JVRC-1)
+model.
