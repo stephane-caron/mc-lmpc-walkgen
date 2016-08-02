@@ -57,8 +57,8 @@ There are three scripts you can run:
   a "tainted" color between red and blue.
 - [static\_equilibrium/comparison.py](/static_equilibrium/comparison.py)
   compares computation times for four different algorithms calculating the
-  static-equilibrium polygon. Requires [IPython](https://ipython.org/) in order
-  to use the ``%timeit`` function.
+  static-equilibrium polygon (see the Appendix of the paper). Requires
+  [IPython](https://ipython.org/) in order to use the ``%timeit`` function.
 - [static\_equilibrium/figure-2.py](/static_equilibrium/figure-2.py) generates
   Figure 2 from the paper.
 
