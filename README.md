@@ -10,7 +10,7 @@ of our algorithm is the calculation of contact-stability constraints. Thanks to
 a mathematical observation on the algebraic nature of the frictional wrench
 cone, we show that the 3D volume of feasible COM accelerations is a always a
 downward-pointing cone. We reduce its computation to a convex hull of (dual) 2D
-points, for which optimal (nlogn) algorithms are readily available. This
+points, for which optimal O(n log n) algorithms are readily available. This
 reformulation brings a significant speedup compared to previous methods, which
 allows us to compute time-varying contact-stability criteria fast enough for
 the control loop. Next, we propose a conservative trajectory-wide
@@ -25,9 +25,7 @@ Authors:
 [Stéphane Caron](https://scaron.info) and
 [Abderrahmane Kheddar](http://www.lirmm.fr/lirmm_eng/users/utilisateurs-lirmm/equipes/idh/abderrahmane-kheddar)
 
-Ressources:
-
-- [Pre-pring on HAL](https://hal.archives-ouvertes.fr/hal-01349880)
+- [Pre-print on HAL](https://hal.archives-ouvertes.fr/hal-01349880)
 - [Accompanying video](https://scaron.info/videos/pre-print-2016-1.mp4)
 
 ## Installation
