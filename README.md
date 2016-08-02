@@ -34,8 +34,7 @@ This project relies on the following dependencies:
 
 - [OpenRAVE](https://github.com/rdiankov/openrave)
 - [pycddlib](https://github.com/mcmtroffaes/pycddlib)
-- [pymanoid](https://github.com/stephane-caron/pymanoid), automatically
-  added as a Git submodule
+- [pymanoid](https://github.com/stephane-caron/pymanoid) (automatically added as a Git submodule)
 - [quadprog](https://github.com/rmcgibbo/quadprog)
 
 On Ubuntu 14.04, once you have [installed
