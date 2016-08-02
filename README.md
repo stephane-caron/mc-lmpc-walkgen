@@ -59,7 +59,7 @@ There are three scripts you can run:
   compares computation times for four different algorithms calculating the
   static-equilibrium polygon (see the Appendix of the paper). Requires
   [IPython](https://ipython.org/) in order to use the ``%timeit`` function.
-- [static\_equilibrium/figure-2.py](/static_equilibrium/figure-2.py) generates
+- [static\_equilibrium/figure2.py](/static_equilibrium/figure2.py) generates
   Figure 2 from the paper.
 
 Due to the copyright problem, we cannot release the COLLADA model ``HRP4R.dae``
