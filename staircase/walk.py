@@ -43,6 +43,7 @@ except ImportError:
 from numpy import arange, cos, hstack, pi, sin, zeros, array
 from numpy.random import random, seed
 from pymanoid import draw_force, draw_polygon, Contact, PointMass
+from pymanoid.tasks import ContactTask, DOFTask, LinkPoseTask, MinCAMTask
 from threading import Lock
 from time import sleep as real_sleep
 from time import time as real_time
@@ -167,20 +168,22 @@ def fsm_post_step_callback():
         normal=[0, 0, 1])
     # (2) Update IK tasks
     with robot_lock:
-        robot.remove_link_task(robot.left_foot)
-        robot.remove_link_task(robot.right_foot)
+        robot.ik.remove_task(robot.left_foot.name)
+        robot.ik.remove_task(robot.right_foot.name)
         if fsm.cur_stance.left_foot is not None:
-            robot.add_contact_task(
-                robot.left_foot, fsm.cur_stance.left_foot)
+            robot.ik.add_task(
+                ContactTask(robot, robot.left_foot, fsm.cur_stance.left_foot))
         else:  # left_foot is free
             fsm.free_foot.reset(robot.left_foot.pose, fsm.next_contact.pose)
-            robot.add_link_pose_task(robot.left_foot, fsm.free_foot)
+            robot.ik.add_task(
+                LinkPoseTask(robot, robot.left_foot, fsm.free_foot))
         if fsm.cur_stance.right_foot is not None:
-            robot.add_contact_task(
-                robot.right_foot, fsm.cur_stance.right_foot)
+            robot.ik.add_task(
+                ContactTask(robot, robot.right_foot, fsm.cur_stance.right_foot))
         else:  # right_foot is free
             fsm.free_foot.reset(robot.right_foot.pose, fsm.next_contact.pose)
-            robot.add_link_pose_task(robot.right_foot, fsm.free_foot)
+            robot.ik.add_task(
+                LinkPoseTask(robot, robot.right_foot, fsm.free_foot))
 
 
 last_bkgnd_switch = None
@@ -245,7 +248,7 @@ if __name__ == "__main__":
                 # updated by commit c7851e092a0876ae... (see log for details)
                 'com': 1.,
                 'contact': 0.9,
-                'link': 0.9,
+                'link_pose': 0.9,
                 'posture': 0.005,
             },
             weights={
@@ -254,13 +257,13 @@ if __name__ == "__main__":
                 # f2c24b95936aacb6b905f9adfb0cc07af3127b2d.
                 'com': 5.,
                 'contact': 100.,
-                'link': 100.,  # not 5.
+                'link_pose': 100.,  # not 5.
                 'posture': 0.1,
             })
         robot.set_dof_values([2.], [robot.TRANS_Z])  # start PG from above
         robot.generate_posture(fsm.cur_stance, max_it=200)
-        robot.update_com_task(com_buffer.com)
-        robot.add_min_cam_task(weight=0.1)
+        robot.ik.tasks['com'].update_target(com_buffer.com)
+        robot.ik.add_task(MinCAMTask(robot, weight=0.1))
 
     def start():
         global start_time
