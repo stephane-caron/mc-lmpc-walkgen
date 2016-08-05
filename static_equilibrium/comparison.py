@@ -33,6 +33,7 @@ except ImportError:
     script_path = os.path.realpath(__file__)
     sys.path.append(os.path.dirname(script_path) + '/../pymanoid')
     import pymanoid
+    from pymanoid.tasks import COMTask
 
 from scipy.spatial import ConvexHull
 from static_equilibrium_polygon import compute_static_polygon_bretl
@@ -252,7 +253,7 @@ if __name__ == "__main__":
             robot.chest + robot.legs + robot.arms + robot.free)
         robot.init_ik()
         robot.generate_posture(contacts)
-        robot.add_com_task(com_target)
+        robot.ik.add_task(COMTask(robot, com_target))
 
     thread.start_new_thread(run_ik_thread, ())
     thread.start_new_thread(draw_cdd_thread, ())

@@ -31,6 +31,7 @@ except ImportError:
     script_path = os.path.realpath(__file__)
     sys.path.append(os.path.dirname(script_path) + '/../pymanoid')
     import pymanoid
+    from pymanoid.tasks import COMTask
 
 try:
     from mpc3d.cwc import compute_cwc_pyparma
@@ -263,7 +264,7 @@ if __name__ == "__main__":
             robot.chest + robot.free + robot.legs + robot.arms)
         robot.init_ik()
         robot.generate_posture(contacts)
-        robot.add_com_task(com_target)
+        robot.ik.add_task(COMTask(robot, com_target))
 
     recompute_static_polygon()
 
