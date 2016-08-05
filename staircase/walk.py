@@ -265,6 +265,23 @@ if __name__ == "__main__":
         robot.ik.tasks['com'].update_target(com_buffer.com)
         robot.ik.add_task(MinCAMTask(robot, weight=0.1))
 
+        try:  # HRP-4
+            robot.ik.add_task(
+                DOFTask(robot, robot.CHEST_P, 0.2, gain=0.9, weight=0.05))
+            robot.ik.add_task(
+                DOFTask(robot, robot.CHEST_Y, 0., gain=0.9, weight=0.05))
+            robot.ik.add_task(
+                DOFTask(robot, robot.ROT_P, 0., gain=0.9, weight=0.05))
+        except AttributeError:  # JVRC-1
+            robot.ik.add_task(
+                DOFTask(robot, robot.WAIST_P, 0.2, gain=0.9, weight=0.5))
+            robot.ik.add_task(
+                DOFTask(robot, robot.WAIST_Y, 0., gain=0.9, weight=0.5))
+            robot.ik.add_task(
+                DOFTask(robot, robot.WAIST_R, 0., gain=0.9, weight=0.5))
+            robot.ik.add_task(
+                DOFTask(robot, robot.ROT_P, 0., gain=0.9, weight=0.5))
+
     def start():
         global start_time
         fsm.start_thread(dt, fsm_post_step_callback, sim_sleep)
