@@ -143,12 +143,10 @@ class StanceFSM(object):
         self.cyclic = cyclic
         self.ds_duration = ds_duration
         self.free_foot = FreeLimb(visible=False, color='c')
-        # self.left_foot_traj = []
         self.left_foot_traj_handles = []
         self.nb_contacts = len(contacts)
         self.next_contact_id = 2 if init_state == 'DS-R' else 3  # kroooon
         self.rem_time = 0.
-        # self.right_foot_traj = []
         self.right_foot_traj_handles = []
         self.ss_duration = ss_duration
         self.state = init_state
@@ -175,7 +173,7 @@ class StanceFSM(object):
         self.thread_lock = None
 
     def run_thread(self, dt, post_step_callback, sleep_fun):
-        record_foot_traj = False
+        record_foot_traj = True
         while self.thread_lock:
             with self.thread_lock:
                 post_step_callback()
@@ -191,12 +189,10 @@ class StanceFSM(object):
                         self.free_foot.update_pose(progress)
                         if record_foot_traj:
                             if self.cur_stance.left_foot:
-                                # self.right_foot_traj.append(self.free_foot.p)
                                 self.right_foot_traj_handles.append(
                                     draw_line(prev_pos, self.free_foot.p,
                                               color='r', linewidth=3))
                             else:
-                                # self.left_foot_traj.append(self.free_foot.p)
                                 self.left_foot_traj_handles.append(
                                     draw_line(prev_pos, self.free_foot.p,
                                               color='g', linewidth=3))

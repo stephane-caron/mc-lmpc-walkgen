@@ -244,21 +244,16 @@ if __name__ == "__main__":
         robot.set_active_dofs(active_dofs)
         robot.init_ik(
             gains={
-                # NB: compared with pre-print values, pymanoid gains have been
-                # updated by commit c7851e092a0876ae... (see log for details)
                 'com': 1.,
-                'contact': 0.9,
-                'link_pose': 0.9,
-                'posture': 0.005,
+                'contact': 1.,
+                'link_pose': 1.,
+                'posture': 1.,
             },
             weights={
-                # NB: due to an IK bug, the pre-print video was generated with
-                # a free link gain of 100 instead of 5; see pymanoid commit
-                # f2c24b95936aacb6b905f9adfb0cc07af3127b2d.
-                'com': 5.,
-                'contact': 10000.,
+                'com': 10.,
+                'contact': 1000.,
                 'link_pose': 100.,
-                'posture': 0.1,
+                'posture': 1.,
             })
         robot.set_dof_values([2.], [robot.TRANS_Z])  # start PG from above
         robot.generate_posture(fsm.cur_stance, max_it=200)
@@ -281,6 +276,12 @@ if __name__ == "__main__":
                 DOFTask(robot, robot.WAIST_R, 0., gain=0.9, weight=0.5))
             robot.ik.add_task(
                 DOFTask(robot, robot.ROT_P, 0., gain=0.9, weight=0.5))
+
+    # with robot_lock:
+    #    active_dofs += robot.left_arm + robot.right_arm
+    #    robot.set_active_dofs(active_dofs)
+    #    robot.ik.tasks['com'].exclude_dofs(robot.left_arm + robot.right_arm)
+    #    robot.ik.tasks['mincam'].exclude_dofs(robot.left_leg + robot.right_leg)
 
     def start():
         global start_time
