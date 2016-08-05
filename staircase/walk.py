@@ -256,8 +256,8 @@ if __name__ == "__main__":
                 # a free link gain of 100 instead of 5; see pymanoid commit
                 # f2c24b95936aacb6b905f9adfb0cc07af3127b2d.
                 'com': 5.,
-                'contact': 100.,
-                'link_pose': 100.,  # not 5.
+                'contact': 10000.,
+                'link_pose': 100.,
                 'posture': 0.1,
             })
         robot.set_dof_values([2.], [robot.TRANS_Z])  # start PG from above
