@@ -20,16 +20,19 @@
 
 import pymanoid
 
-from numpy import array, cross, dot, float64, hstack, ones, vstack
+from numpy import array, cross, dot, float64, hstack, ones, sqrt, vstack
 from polygons import compute_polygon_hull
 from pymanoid.draw import draw_3d_cone, draw_line, draw_polyhedron
 from pymanoid.polyhedra import Polytope
-from pymanoid.utils import normalize
 from warnings import warn
 
 # import time
 # from numpy import average, std
 # comp_times = []
+
+
+def normalize(v):
+    return v / sqrt(dot(v, v))
 
 
 def reduce_polar_system(B, c):

@@ -18,9 +18,12 @@
 # You should have received a copy of the GNU General Public License along with
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
-from numpy import array, hstack, cross
-from pymanoid.utils import normalize
+from numpy import array, hstack, cross, dot, sqrt
 from scipy.spatial import ConvexHull
+
+
+def normalize(v):
+    return v / sqrt(dot(v, v))
 
 
 def compute_polygon_hull(B, c, using_pyparma=False):

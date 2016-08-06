@@ -30,25 +30,28 @@ Authors:
 
 ## Installation
 
-This project relies on the following dependencies:
-
-- [OpenRAVE](https://github.com/rdiankov/openrave)
-- [pycddlib](https://github.com/mcmtroffaes/pycddlib)
-- [pymanoid](https://github.com/stephane-caron/pymanoid) (automatically added as a Git submodule)
-- [quadprog](https://github.com/rmcgibbo/quadprog)
-
 On Ubuntu 14.04, once you have [installed
 OpenRAVE](https://scaron.info/teaching/installing-openrave-on-ubuntu-14.04.html),
-all other dependencies follow by:
+do:
 
 ```bash
 sudo apt-get install cython python python-dev python-pip python-scipy
 sudo pip install pycddlib quadprog
 ```
 
+Then, clone the repository and its submodule via:
+
+```bash
+git clone --recursive https://github.com/stephane-caron/3d-mpc.git
+```
+
+If you already have [pymanoid](https://github.com/stephane-caron/pymanoid)
+installed on your system, be sure that its version matches the one used by
+``3d-mpc``.
+
 ## Usage
 
-There are three scripts you can run:
+There are three Python scripts you can run:
 
 - [staircase/walk.py](/staircase/walk.py) walks the humanoid model around a
   circular staircase with tilted stepping stones. Supporting contact forces are

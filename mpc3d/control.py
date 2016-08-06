@@ -19,20 +19,25 @@
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
 from tube import TrajectoryTube
-from numpy import array, eye, dot, zeros, hstack, vstack, bmat, ones, average
-from pymanoid import PointMass
-from pymanoid.qp import cvxopt_solve_qp
-from pymanoid.qp import qpoases_solve_qp
-from pymanoid.qp import quadprog_solve_qp
-from pymanoid.utils import norm
+from numpy import array, bmat, dot, eye, hstack, ones, sqrt, vstack, zeros
+from pymanoid import PointMass, solve_qp
 from scipy.linalg import block_diag
 from threading import Lock, Thread
 from warnings import warn
 
 
+def norm(v):
+    return sqrt(dot(v, v))
+
+
 COMPARE_QP_SOLVERS = False
 
 if COMPARE_QP_SOLVERS:
+    # https://github.com/stephane-caron/oqp
+    from oqp import solve_qp_cvxopt
+    from oqp import solve_qp_qpoases
+    from oqp import solve_qp_quadprog
+    from numpy import average
     import time
     l0 = []
     l1 = []
@@ -141,7 +146,7 @@ class PreviewControl(object):
                 warn("|U0 - U1| = %.1e and |U2 - U1| = %.1e" % (
                     norm(U0 - U1), norm(U2 - U1)))
 
-        self.U = quadprog_solve_qp(P, q, G, h)
+        self.U = solve_qp(P, q, G, h)
         e = dot(A, self.U) - b
         self.end_cost = dot(e, e)
 
