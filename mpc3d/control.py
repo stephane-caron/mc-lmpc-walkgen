@@ -128,13 +128,13 @@ class PreviewControl(object):
 
         if COMPARE_QP_SOLVERS:
             t0 = time.time()
-            U0 = cvxopt_solve_qp(P, q, G, h)
+            U0 = solve_qp_cvxopt(P, q, G, h)
             t1 = time.time()
             l0.append(t1 - t0)
-            U1 = qpoases_solve_qp(P, q, G, h)
+            U1 = solve_qp_qpoases(P, q, G, h)
             t2 = time.time()
             l1.append(t2 - t1)
-            U2 = quadprog_solve_qp(P, q, G, h)
+            U2 = solve_qp_quadprog(P, q, G, h)
             l2.append(time.time() - t2)
             if len(l0) % 100 == 0 and False:
                 print "Over %.2f s (%d iterations)" % (t2 - t_origin, len(l0))
