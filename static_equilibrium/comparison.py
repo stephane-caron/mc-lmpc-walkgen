@@ -257,9 +257,11 @@ if __name__ == "__main__":
 
     thread.start_new_thread(run_ik_thread, ())
     thread.start_new_thread(draw_cdd_thread, ())
-    thread.start_new_thread(draw_bretl_thread, ())
+    if 'figure2-single.json' not in fname:
+        thread.start_new_thread(draw_bretl_thread, ())
     thread.start_new_thread(draw_pyparma_thread, ())
-    thread.start_new_thread(draw_cdd_only_thread, ())
+    if 'figure2-single.json' not in fname:
+        thread.start_new_thread(draw_cdd_only_thread, ())
 
     print ""
     print "Static-equilibrium polygon computations"
@@ -275,10 +277,14 @@ if __name__ == "__main__":
     time.sleep(1)
     print "Benchmarking computation times"
     print "------------------------------"
-    for call in ['compute_static_polygon_bretl(contacts)',
-                 'compute_static_polygon_cdd_hull(contacts)',
-                 'compute_static_polygon_pyparma_hull(contacts)',
-                 'compute_static_polygon_cdd_only(contacts, robot_mass)']:
+    function_calls = ['compute_static_polygon_cdd_hull(contacts)',
+                      'compute_static_polygon_pyparma_hull(contacts)']
+    if 'figure2-single.json' not in fname:
+        function_calls.append(
+            'compute_static_polygon_bretl(contacts)')
+        function_calls.append(
+            'compute_static_polygon_cdd_only(contacts, robot_mass)')
+    for call in function_calls:
         print "\n%%timeit %s" % call
         for _ in xrange(1):
             IPython.get_ipython().magic(u'timeit %s' % call)
