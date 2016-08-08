@@ -272,6 +272,11 @@ if __name__ == "__main__":
     print "- Yellow area: computed using Parma + Qhull"
     print "- Green area: computed using Bretl and Lall's method"
     print ""
+    if 'figure2-single.json' in fname:
+        print "Note: not showing (Bretl and Lall) nor (cdd only) areas as these"
+        print "two algorithms fail to compute the area in this single-support"
+        print "configuration."
+        print ""
     time.sleep(2)
     freeze = True
     time.sleep(1)
