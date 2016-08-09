@@ -233,6 +233,8 @@ class FeedbackPreviewController(object):
                 continue
             com_face = tube.compute_primal_polytope()
             comdd_face = tube.compute_dual_cone()
+            A, b = com_face
+            assert all(dot(A, cur_com) <= b), "haha!"
             if comdd_face is None:
                 continue
             if self.draw_cone:
@@ -250,15 +252,18 @@ class FeedbackPreviewController(object):
                 warn("MPC failed: inconsistent constraints?")
                 print e
                 i += 1
-                if i > 120:
-                    print "cur_com =", cur_com
-                    print "cur_comd =", cur_comd
-                    print "target_com =", target_com
-                    print "target_comd =", target_comd
+                if i > 10:
+                    print "cur_com =", repr(cur_com)
+                    print "cur_comd =", repr(cur_comd)
+                    print "target_com =", repr(target_com)
+                    print "target_comd =", repr(repr(target_comd))
                     print "com_face =", com_face
                     print "\t", tube.vertices
                     print "comdd_face =", comdd_face
                     print "\t", tube.cone_vertices
                     print "preview_horizon =", preview_horizon
                     print "nb_steps =", self.nb_mpc_steps
+                    print ""
+                    print "cur_stance.left_foot", cur_stance.left_foot
+                    print "cur_stance.right_foot", cur_stance.right_foot
                     break
