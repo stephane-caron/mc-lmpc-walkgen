@@ -19,7 +19,7 @@
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
 from tube import TrajectoryTube
-from numpy import array, bmat, dot, eye, hstack, sqrt, zeros
+from numpy import array, bmat, dot, eye, hstack, sqrt, vstack, zeros
 from pymanoid import PointMass, solve_qp
 from scipy.linalg import block_diag
 from threading import Lock, Thread
@@ -32,7 +32,7 @@ def norm(v):
 
 class PreviewControl(object):
 
-    def __init__(self, A, B, C, d, x_init, x_goal, nb_steps):
+    def __init__(self, A, B, C, d, E, f, x_init, x_goal, nb_steps):
         """
         Preview control for a system with linear dynamics:
 
@@ -40,15 +40,29 @@ class PreviewControl(object):
 
         subject to constraints:
 
-            C * u <= d
-            x(0) = x_init
-            x(duration) = x_goal
+            for all k,   C * u_k <= d
+            for all k,   E * x_k <= f
+            x_0 = x_init
+            x_{nb_steps} = x_goal
 
+        INPUT:
+
+        - ``A`` -- state linear dynamics matrix
+        - ``B`` -- control linear dynamics matrix
+        - ``C`` -- H-representation matrix for control constraints
+        - ``d`` -- H-representation vector for control constraints
+        - ``E`` -- H-representation matrix for state constraints
+        - ``f`` -- H-representation vector for state constraints
+        - ``x_init`` -- initial state
+        - ``x_goal`` -- goal state
+        - ``nb_steps`` -- number of discretized time steps
         """
         self.A = A
         self.B = B
         self.C = C
         self.d = d
+        self.E = E
+        self.f = f
         self.nb_steps = nb_steps
         self.u_dim = C.shape[1]
         self.U_dim = self.u_dim * self.nb_steps
@@ -75,16 +89,27 @@ class PreviewControl(object):
             U = [u_0 ... u_{N-1}]
             X = [x_0 ... x_{N-1}]
 
+            x_k = phi[k] * x_0 + psi[k] * U
             x_N = phi_last * x_0 + psi_last * U
 
         """
         N = self.nb_steps
         phi = eye(self.x_dim)
         psi = zeros((self.x_dim, self.U_dim))
-        for i in xrange(N):
+        G, h = [], []  # list of matrices for inequalities G * x <= h
+        for k in xrange(N):
+            # Here: x_k = phi * x_init + psi * U
+            # State inequality: E * x_k <= f
+            # that is, (E * psi) * U <= f - (E * phi) * x_init
+            G.append(dot(self.E, psi))
+            h.append(self.f - dot(dot(self.E, phi), self.x_init))
+
+            # Now we update phi and psi for iteration k + 1
             phi = dot(self.A, phi)
             psi = dot(self.A, psi)
-            psi[:, self.u_dim * i:self.u_dim * (i + 1)] = self.B
+            psi[:, self.u_dim * k:self.u_dim * (k + 1)] = self.B
+        self.G_state = vstack(G)
+        self.h_state = vstack(h)
         self.phi_last = phi
         self.psi_last = psi
 
@@ -105,19 +130,23 @@ class PreviewControl(object):
         P = w1 * P1 + w2 * P2
         q = w1 * q1 + w2 * q2
 
-        # Inequality constraints on controls
-        G = block_diag(*[self.C for _ in xrange(self.nb_steps)])
-        h = hstack([self.d for _ in xrange(self.nb_steps)])
+        # Inequality constraints
+        G_control = block_diag(*[self.C for _ in xrange(self.nb_steps)])
+        h_control = hstack([self.d for _ in xrange(self.nb_steps)])
+        # G = vstack([G_control, self.G_state])
+        # h = hstack([h_control, self.h_state])
+        G = G_control
+        h = h_control
 
         self.U = solve_qp(P, q, G, h)
-        e = dot(A, self.U) - b
-        self.end_cost = dot(e, e)
+        # e = dot(A, self.U) - b
+        # self.end_cost = dot(e, e)
 
 
 class COMAccelPreviewControl(PreviewControl):
 
-    def __init__(self, com_init, comd_init, com_goal, comd_goal, comdd_face,
-                 duration, nb_steps):
+    def __init__(self, com_init, comd_init, com_goal, comd_goal, com_face,
+                 comdd_face, duration, nb_steps):
         assert com_init.shape[0] == 3
         assert com_goal.shape[0] == 3
         assert comd_init.shape[0] == 3
@@ -131,11 +160,14 @@ class COMAccelPreviewControl(PreviewControl):
             [.5 * dT ** 2 * I],
             [dT * I]]))
         C, d = comdd_face
+        E_pos, f = com_face
+        E = hstack([E_pos, zeros(E_pos.shape)])
         assert C.shape[1] == 3, "C.shape = %s" % str(C.shape)
+        assert E.shape[1] == 6, "E.shape = %s" % str(E.shape)
         x_init = hstack([com_init, comd_init])
         x_goal = hstack([com_goal, comd_goal])
         super(COMAccelPreviewControl, self).__init__(
-            A, B, C, d, x_init, x_goal, nb_steps)
+            A, B, C, d, E, f, x_init, x_goal, nb_steps)
         self.duration = duration
         self.timestep = dT
 
@@ -200,6 +232,7 @@ class FeedbackPreviewController(object):
                 cur_com, target_com, cur_stance, self.tube_shape)
             if tube.nb_vertices < 2:
                 continue
+            com_face = tube.compute_primal_polytope()
             comdd_face = tube.compute_dual_cone()
             if comdd_face is None:
                 continue
@@ -209,7 +242,9 @@ class FeedbackPreviewController(object):
                 self.tube_handle = tube.draw()
             try:
                 preview_control = COMAccelPreviewControl(
-                    cur_com, cur_comd, target_com, target_comd, comdd_face,
+                    cur_com, cur_comd,
+                    target_com, target_comd,
+                    com_face, comdd_face,
                     preview_horizon, nb_steps=self.nb_mpc_steps)
                 self.com_buffer.update_control(preview_control)
             except ValueError:

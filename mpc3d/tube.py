@@ -135,6 +135,17 @@ class TrajectoryTube(object):
         c = hstack(c_list)
         return (B, c)
 
+    def compute_primal_polytope(self):
+        """
+        Compute the primal representation of the tube, i.e. the H-representation
+        of its Euclidean polytope.
+
+        OUTPUT:
+
+        A tuple (A, b) such that the H-representation is A * x <= b.
+        """
+        return Polytope.hrep(self.vertices)
+
     def compute_dual_cone(self):
         # t0 = time.time()
         B0, c0 = self.compute_bare_dual_cone()
