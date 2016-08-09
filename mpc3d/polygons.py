@@ -18,27 +18,33 @@
 # You should have received a copy of the GNU General Public License along with
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
-from numpy import array, hstack, cross, dot, sqrt
+from numpy import array, hstack
 from scipy.spatial import ConvexHull
 
 
-def normalize(v):
-    return v / sqrt(dot(v, v))
+def compute_polygon_hull(B, c):
+    """
+    Compute the vertex representation of a polygon defined by:
 
+        B * x <= c
 
-def compute_polygon_hull(B, c, using_pyparma=False):
-    #
-    # vertices, _ = project_polytope_cdd(B, c, None, None, eye(2), zeros(2))
-    # return [p + outbox.p[:2] for p in vertices]
-    #
-    assert B.shape[1] == 2
-    if any(abs(c) < 1e-10):
-        assert False, "ici"
-        I = [i for i in xrange(len(c)) if abs(c[i]) > 1e-10]
-        B, c = B[I], c[I]
-    # if not using_pyparma:
-    #     # there may be integer overflows in pyparma
-    #     assert all(c > 0), "kron"
+    The origin [0, 0] should lie inside the polygon (c >= 0) in order to build
+    the polar form. This case can always be reached if there is a solution by
+    translating to an interior point of the polygon. (This function will not
+    compute the interior point automatically.)
+
+    INPUT:
+
+    - ``B`` -- (2 x K) matrix
+    - ``c`` -- vector of length K and positive coordinates
+
+    OUTPUT:
+
+    List of 2D vertices.
+    """
+    assert B.shape[1] == 2, "Input is not a polygon"
+    assert all(c > 0), "Polygon should contain the origin"
+
     B_polar = hstack([
         (B[:, column] * 1. / c).reshape((B.shape[0], 1))
         for column in xrange(2)])
@@ -53,23 +59,3 @@ def compute_polygon_hull(B, c, using_pyparma=False):
     hull = ConvexHull([row for row in B_polar], qhull_options='Pp')
     vertices = [axis_intersection(i, j) for (i, j) in hull.simplices]
     return vertices
-    # return simplify_polygon(vertices)
-
-
-def simplify_polygon(vertices, thres=0.1):
-    """
-
-    thres -- 0.1 ~ 5 deg deviation
-    """
-    nr_vertices = []
-    n = len(vertices)
-    for i, b in enumerate(vertices):
-        a = vertices[(i + n - 1) % n]
-        c = vertices[(i + 1) % n]
-        u_ab = normalize(b - a)
-        u_ac = normalize(c - a)
-        if abs(cross(u_ab, u_ac)) > thres:
-            # print "cross =", abs(cross(u_ab, u_ac))
-            nr_vertices.append(b)
-    # print "%d -> %d" % (len(vertices), len(nr_vertices))
-    return nr_vertices

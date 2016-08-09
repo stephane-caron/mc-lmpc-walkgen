@@ -64,17 +64,16 @@ def compute_static_polygon_bretl(contact_set):
 
 def compute_static_polygon_cdd_hull(contact_set, p=[0, 0, 0]):
     A_O = contact_set.compute_wrench_cone(p)
-    # A_O = compute_cwc_cddfrac(contact_set, [0, 0, 0])
     k, a_Oz, a_x, a_y = A_O.shape[0], A_O[:, 2], A_O[:, 3], A_O[:, 4]
     B, c = hstack([-a_y.reshape((k, 1)), +a_x.reshape((k, 1))]), -a_Oz
     return compute_polygon_hull(B, c)
 
 
-def compute_static_polygon_pyparma_hull(contact_set):
-    A_O = compute_cwc_pyparma(contact_set, [0, 0, 0])
+def compute_static_polygon_pyparma_hull(contact_set, p=[0, 0, 0]):
+    A_O = compute_cwc_pyparma(contact_set, p)
     k, a_Oz, a_x, a_y = A_O.shape[0], A_O[:, 2], A_O[:, 3], A_O[:, 4]
     B, c = hstack([-a_y.reshape((k, 1)), +a_x.reshape((k, 1))]), -a_Oz
-    return compute_polygon_hull(B, c, using_pyparma=True)
+    return compute_polygon_hull(B, c)
 
 
 def compute_static_polygon_cdd_only(contact_set, mass):

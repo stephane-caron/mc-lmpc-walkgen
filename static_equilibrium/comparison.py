@@ -18,10 +18,11 @@
 # You should have received a copy of the GNU General Public License along with
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
+SHOW_ROBOT = False
+
 import IPython
 import numpy
 import os
-import pylab
 import sys
 import thread
 import threading
@@ -48,6 +49,7 @@ except ImportError:
 
 
 cyan = (0., 0.5, 0.5, 0.5)
+robot = None
 robot_mass = 39  # [kg], updated once robot model is loaded
 dt = 3e-2  # [s]
 robot_lock = threading.Lock()
@@ -79,7 +81,8 @@ def run_ik_thread():
             time.sleep(dt)
             continue
         with robot_lock:
-            robot.step_ik(dt)
+            if robot is not None:
+                robot.step_ik(dt)
             com_target.set_x(outbox.x)
             com_target.set_y(outbox.y)
             com_target.set_z(outbox.z - z_high + z_mid)
@@ -141,21 +144,6 @@ def draw_cdd_only_thread():
         vertices = compute_static_polygon_cdd_only(contacts, robot_mass)
         gui_handles['cdd_only'] = draw_com_polygon(vertices, black)
         time.sleep(1e-2)
-
-
-def debug(a_Oz, a_x, a_y, fignum=1):
-    k = a_Oz.shape[0]
-    # B = numpy.hstack([
-    #     -a_y.reshape((k, 1)),
-    #     +a_x.reshape((k, 1))])
-    # print "A_O.shape:", A_O.shape
-    print "a_Oz:", "min =", min(a_Oz), "max =", max(a_Oz)
-    B_polar = numpy.hstack([
-        -(a_y * 1. / -a_Oz).reshape((k, 1)),
-        +(a_x * 1. / -a_Oz).reshape((k, 1))])
-    pylab.figure(fignum)
-    pylab.clf()
-    show_plots(B_polar, numpy.ones(B_polar.shape[0]))
 
 
 def show_plots(B, c, lim=1.):
@@ -230,14 +218,15 @@ if __name__ == "__main__":
         [-0.79126787, -0.36933163,  0.48732874, -1.6965636],
         [0.08254916, -0.85420468, -0.51334199,  2.79584694],
         [0.,  0.,  0.,  1.]]))
-    robot = RobotModel(download_if_needed=True)
-    robot.set_transparency(0.2)
-    robot_mass = robot.mass
+    if SHOW_ROBOT:
+        robot = RobotModel(download_if_needed=True)
+        robot.set_transparency(0.2)
+        robot_mass = robot.mass
 
     fname = sys.argv[1] if len(sys.argv) > 1 else 'stances/figure2-triple.json'
     contacts = pymanoid.ContactSet.from_json(fname)
 
-    com_target = pymanoid.Cube(0.01, visible=False)
+    com_target = pymanoid.Cube(0.01, visible=True)
     outbox = pymanoid.Cube(0.02, color='b')
 
     if 'figure2-single.json' in fname:
@@ -247,21 +236,14 @@ if __name__ == "__main__":
     else:
         warn("Unknown contact set, you will have to set the COM position.")
 
-    with robot_lock:
-        robot.set_dof_values(robot.q_halfsit)
-        robot.set_active_dofs(
-            robot.chest + robot.legs + robot.arms + robot.free)
-        robot.init_ik()
-        robot.generate_posture(contacts)
-        robot.ik.add_task(COMTask(robot, com_target))
-
-    thread.start_new_thread(run_ik_thread, ())
-    thread.start_new_thread(draw_cdd_thread, ())
-    if 'figure2-single.json' not in fname:
-        thread.start_new_thread(draw_bretl_thread, ())
-    thread.start_new_thread(draw_pyparma_thread, ())
-    if 'figure2-single.json' not in fname:
-        thread.start_new_thread(draw_cdd_only_thread, ())
+    if SHOW_ROBOT:
+        with robot_lock:
+            robot.set_dof_values(robot.q_halfsit)
+            robot.set_active_dofs(
+                robot.chest + robot.legs + robot.arms + robot.free)
+            robot.init_ik()
+            robot.generate_posture(contacts)
+            robot.ik.add_task(COMTask(robot, com_target))
 
     print ""
     print "Static-equilibrium polygon computations"
@@ -272,25 +254,21 @@ if __name__ == "__main__":
     print "- Yellow area: computed using Parma + Qhull"
     print "- Green area: computed using Bretl and Lall's method"
     print ""
-    if 'figure2-single.json' in fname:
-        print "Note: not showing (Bretl and Lall) nor (cdd only) areas as these"
-        print "two algorithms fail to compute the area in this single-support"
-        print "configuration."
-        print ""
-    time.sleep(2)
-    freeze = True
-    time.sleep(1)
     print "Benchmarking computation times"
     print "------------------------------"
     function_calls = ['compute_static_polygon_cdd_hull(contacts)',
-                      'compute_static_polygon_pyparma_hull(contacts)']
-    if 'figure2-single.json' not in fname:
-        function_calls.append(
-            'compute_static_polygon_bretl(contacts)')
-        function_calls.append(
-            'compute_static_polygon_cdd_only(contacts, robot_mass)')
+                      'compute_static_polygon_pyparma_hull(contacts)',
+                      'compute_static_polygon_bretl(contacts)',
+                      'compute_static_polygon_cdd_only(contacts, robot_mass)']
     for call in function_calls:
         print "\n%%timeit %s" % call
         for _ in xrange(1):
             IPython.get_ipython().magic(u'timeit %s' % call)
+
     freeze = False
+    thread.start_new_thread(run_ik_thread, ())
+    thread.start_new_thread(draw_cdd_thread, ())
+    thread.start_new_thread(draw_bretl_thread, ())
+    thread.start_new_thread(draw_pyparma_thread, ())
+    thread.start_new_thread(draw_cdd_only_thread, ())
+    contacts.start_force_thread(com_target, robot_mass, dt=1e-2)

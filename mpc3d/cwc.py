@@ -20,20 +20,20 @@
 
 from fractions import Fraction
 from pyparma import Polyhedron
-from numpy import hstack, vectorize, vstack, zeros
+from numpy import dot, hstack, vectorize, vstack, zeros
 
 
-def compute_cwc_pyparma(contact_set, p):
+def compute_cwc_pyparma(contact_set, p, check_conical=False):
     S = contact_set.compute_wrench_span(p)
     tV = vstack([
-        hstack([zeros((S.shape[1], 1)), -S.T]),
+        hstack([zeros((S.shape[1], 1)), S.T]),
         hstack([1, zeros(S.shape[0])])])
-    fractionize = vectorize(lambda x: Fraction(str(x)))
+    # fractionize = vectorize(lambda x: Fraction(str(x)))
+    fractionize = vectorize(lambda x: Fraction(x))
     poly = Polyhedron(vrep=fractionize(tV))
     hrep = poly.hrep()
     A_O = -hrep[:, 1:]
-    # DEBUG check:
-    # import pylab
-    # b_O = hrep[:, 0]
-    # assert pylab.norm(b_O) < 1e-10
+    if check_conical:
+        b_O = hrep[:, 0]
+        assert dot(b_O, b_O) < 1e-20
     return A_O
