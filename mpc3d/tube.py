@@ -24,6 +24,7 @@ from numpy import array, cross, dot, float64, hstack, ones, sqrt, vstack
 from polygons import compute_polygon_hull
 from pymanoid.draw import draw_3d_cone, draw_line, draw_polyhedron
 from pymanoid.polyhedra import Polytope
+from scipy.spatial.qhull import QhullError
 from warnings import warn
 
 # import time
@@ -41,10 +42,7 @@ def reduce_polar_system(B, c):
     assert g > 0
     # assert all(c > 0), "c > 0 assertion failed"
     # assert all(B[:, 2] < 0)
-    if any(abs(c) < 1e-10):
-        print "ici!!!!!"
-        I = [i for i in xrange(len(c)) if abs(c[i]) > 1e-10]
-        B, c = B[I], c[I]
+    assert all(abs(c) > 1e-10)
     check = c / B[:, 2]
     assert max(check) - min(check) < 1e-10, "max - min failed (%.1e)" % (
         (max(check) - min(check)))
@@ -53,7 +51,12 @@ def reduce_polar_system(B, c):
     B2 = hstack([
         (B[:, column] / sigma).reshape((B.shape[0], 1))
         for column in [0, 1]])
-    vertices2d = compute_polygon_hull(B2, ones(len(c)))
+
+    try:
+        vertices2d = compute_polygon_hull(B2, ones(len(c)))
+    except QhullError:
+        warn("QhullError: maybe output polygon was empty?")
+        return []
 
     def vertices_at(z):
         v = [array([a * (g - z), b * (g - z)]) for (a, b) in vertices2d]
