@@ -19,7 +19,7 @@
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
 from tube import TrajectoryTube
-from numpy import array, bmat, dot, eye, hstack, ones, sqrt, vstack, zeros
+from numpy import array, bmat, dot, eye, hstack, sqrt, zeros
 from pymanoid import PointMass, solve_qp
 from scipy.linalg import block_diag
 from threading import Lock, Thread
@@ -28,21 +28,6 @@ from warnings import warn
 
 def norm(v):
     return sqrt(dot(v, v))
-
-
-COMPARE_QP_SOLVERS = False
-
-if COMPARE_QP_SOLVERS:
-    # https://github.com/stephane-caron/oqp
-    from oqp import solve_qp_cvxopt
-    from oqp import solve_qp_qpoases
-    from oqp import solve_qp_quadprog
-    from numpy import average
-    import time
-    l0 = []
-    l1 = []
-    l2 = []
-    t_origin = time.time()
 
 
 class PreviewControl(object):
@@ -119,32 +104,10 @@ class PreviewControl(object):
         w2 = 1000.
         P = w1 * P1 + w2 * P2
         q = w1 * q1 + w2 * q2
-        if True:
-            G = block_diag(*[self.C for _ in xrange(self.nb_steps)])
-            h = hstack([self.d for _ in xrange(self.nb_steps)])
-        else:
-            G = vstack([+eye(self.U_dim), -eye(self.U_dim)])
-            h = hstack([ones(self.U_dim), ones(self.U_dim)])
 
-        if COMPARE_QP_SOLVERS:
-            t0 = time.time()
-            U0 = solve_qp_cvxopt(P, q, G, h)
-            t1 = time.time()
-            l0.append(t1 - t0)
-            U1 = solve_qp_qpoases(P, q, G, h)
-            t2 = time.time()
-            l1.append(t2 - t1)
-            U2 = solve_qp_quadprog(P, q, G, h)
-            l2.append(time.time() - t2)
-            if len(l0) % 100 == 0 and False:
-                print "Over %.2f s (%d iterations)" % (t2 - t_origin, len(l0))
-                print "- avg. CVXOPT   = %.2f ms" % (1000. * average(l0))
-                print "- avg. qpOASES  = %.2f ms" % (1000. * average(l1))
-                print "- avg. quadprog = %.2f ms" % (1000. * average(l2))
-                print "------------------------"
-            if norm(U0 - U1) > 1e-2 or norm(U2 - U1) > 1e-2:
-                warn("|U0 - U1| = %.1e and |U2 - U1| = %.1e" % (
-                    norm(U0 - U1), norm(U2 - U1)))
+        # Inequality constraints on controls
+        G = block_diag(*[self.C for _ in xrange(self.nb_steps)])
+        h = hstack([self.d for _ in xrange(self.nb_steps)])
 
         self.U = solve_qp(P, q, G, h)
         e = dot(A, self.U) - b
