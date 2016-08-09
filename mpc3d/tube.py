@@ -96,10 +96,16 @@ class TrajectoryTube(object):
             TrajectoryTube.DIAMOND,
             TrajectoryTube.LINE]
         delta = target_com - init_com
+        self.init_com = init_com
+        self.init_stance = init_stance
+        self.shape = shape
+        self.target_com = target_com
         if dot(delta, delta) < 1e-6:
             self.vertices = [init_com]
-            return
-        # center = .5 * (init_com + target_com)
+        else:
+            self.vertices = self.compute_vertices(delta, section_size)
+
+    def compute_vertices(self, delta, section_size):
         n = normalize(delta)
         t = array([0., 0., 1.])
         t -= dot(t, n) * n
@@ -110,21 +116,21 @@ class TrajectoryTube(object):
             (+section_size, -section_size),
             (-section_size, +section_size),
             (-section_size, -section_size)]]
-        if shape == TrajectoryTube.BRICK:
+        tube_start = self.init_com - 0.05 * delta
+        tube_end = self.target_com + 0.05 * delta
+        if self.shape == TrajectoryTube.BRICK:
             vertices = \
-                [init_com + s for s in square] + \
-                [target_com + s for s in square]
-        elif shape == TrajectoryTube.PYRAMID:
-            vertices = [init_com] + [target_com + s for s in square]
-        elif shape == TrajectoryTube.DIAMOND:
-            mid_com = 0.5 * init_com + 0.5 * target_com
-            vertices = [init_com] + [mid_com + s for s in square] + [target_com]
+                [tube_start + s for s in square] + \
+                [tube_end + s for s in square]
+        elif self.shape == TrajectoryTube.PYRAMID:
+            vertices = [tube_start] + [tube_end + s for s in square]
+        elif self.shape == TrajectoryTube.DIAMOND:
+            tube_mid = 0.5 * tube_start + 0.5 * tube_end
+            vertices = [tube_start] + \
+                [tube_mid + s for s in square] + [tube_end]
         else:  # default is TrajectoryTube.LINE
-            vertices = [init_com, target_com]
-        self.init_com = init_com
-        self.init_stance = init_stance
-        self.target_com = target_com
-        self.vertices = vertices
+            vertices = [tube_start, tube_end]
+        return vertices
 
     @property
     def nb_vertices(self):
