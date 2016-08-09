@@ -41,6 +41,11 @@ def compute_polygon_hull(B, c):
     OUTPUT:
 
     List of 2D vertices.
+
+    .. NOTE::
+
+        Checking that (c > 0) is not optional. The rest of the algorithm can be
+        executed when some coordinates c_i < 0, but the result would be wrong.
     """
     assert B.shape[1] == 2, "Input is not a polygon"
     assert all(c > 0), "Polygon should contain the origin"
