@@ -235,7 +235,7 @@ if __name__ == "__main__":
         cyclic=True)
     com_buffer = COMAccelBuffer(com_pm, fsm)
     mpc = FeedbackPreviewController(
-        fsm, com_buffer, nb_mpc_steps=10, tube_shape=2)
+        fsm, com_buffer, nb_mpc_steps=10, tube_shape=8)
 
     with robot_lock:
         robot.set_dof_values(robot.q_halfsit)

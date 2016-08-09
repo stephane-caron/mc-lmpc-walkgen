@@ -68,11 +68,12 @@ def reduce_polar_system(B, c):
 class TrajectoryTube(object):
 
     LINE = 2
+    PYRAMID = 5
     DIAMOND = 6
     BRICK = 8
 
     def __init__(self, init_com, target_com, init_stance, shape,
-                 section_size=0.03):
+                 section_size=0.02):
         """
         Create a new COM trajectory tube.
 
@@ -89,6 +90,11 @@ class TrajectoryTube(object):
             We are assuming that self.init_stance applies to all vertices of the
             tube. See the paper for a discussion of this technical choice.
         """
+        assert shape in [
+            TrajectoryTube.BRICK,
+            TrajectoryTube.PYRAMID,
+            TrajectoryTube.DIAMOND,
+            TrajectoryTube.LINE]
         delta = target_com - init_com
         if dot(delta, delta) < 1e-6:
             self.vertices = [init_com]
@@ -108,6 +114,8 @@ class TrajectoryTube(object):
             vertices = \
                 [init_com + s for s in square] + \
                 [target_com + s for s in square]
+        elif shape == TrajectoryTube.PYRAMID:
+            vertices = [init_com] + [target_com + s for s in square]
         elif shape == TrajectoryTube.DIAMOND:
             mid_com = 0.5 * init_com + 0.5 * target_com
             vertices = [init_com] + [mid_com + s for s in square] + [target_com]
@@ -164,7 +172,7 @@ class TrajectoryTube(object):
             warn("Polytope.hrep(cone_vertices) failed")
             return None
 
-    def draw(self):
+    def draw_primal_polytope(self):
         if not self.vertices:
             return None
         elif len(self.vertices) == 2:

@@ -109,7 +109,7 @@ class PreviewControl(object):
             psi = dot(self.A, psi)
             psi[:, self.u_dim * k:self.u_dim * (k + 1)] = self.B
         self.G_state = vstack(G)
-        self.h_state = vstack(h)
+        self.h_state = hstack(h)
         self.phi_last = phi
         self.psi_last = psi
 
@@ -133,10 +133,8 @@ class PreviewControl(object):
         # Inequality constraints
         G_control = block_diag(*[self.C for _ in xrange(self.nb_steps)])
         h_control = hstack([self.d for _ in xrange(self.nb_steps)])
-        # G = vstack([G_control, self.G_state])
-        # h = hstack([h_control, self.h_state])
-        G = G_control
-        h = h_control
+        G = vstack([G_control, self.G_state])
+        h = hstack([h_control, self.h_state])
 
         self.U = solve_qp(P, q, G, h)
         # e = dot(A, self.U) - b
@@ -222,6 +220,7 @@ class FeedbackPreviewController(object):
 
     def run_thread(self):
         target_comd = zeros(3)
+        i = 0
         while self.thread_lock:
             cur_com = self.com_buffer.com.p
             cur_comd = self.com_buffer.comd
@@ -239,7 +238,7 @@ class FeedbackPreviewController(object):
             if self.draw_cone:
                 self.cone_handle = tube.draw_dual_cone()
             if self.draw_tube:
-                self.tube_handle = tube.draw()
+                self.tube_handle = tube.draw_primal_polytope()
             try:
                 preview_control = COMAccelPreviewControl(
                     cur_com, cur_comd,
@@ -247,5 +246,19 @@ class FeedbackPreviewController(object):
                     com_face, comdd_face,
                     preview_horizon, nb_steps=self.nb_mpc_steps)
                 self.com_buffer.update_control(preview_control)
-            except ValueError:
+            except ValueError as e:
                 warn("MPC failed: inconsistent constraints?")
+                print e
+                i += 1
+                if i > 120:
+                    print "cur_com =", cur_com
+                    print "cur_comd =", cur_comd
+                    print "target_com =", target_com
+                    print "target_comd =", target_comd
+                    print "com_face =", com_face
+                    print "\t", tube.vertices
+                    print "comdd_face =", comdd_face
+                    print "\t", tube.cone_vertices
+                    print "preview_horizon =", preview_horizon
+                    print "nb_steps =", self.nb_mpc_steps
+                    break
