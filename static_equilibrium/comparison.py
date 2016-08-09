@@ -131,8 +131,12 @@ def draw_bretl_thread():
         if freeze or screenshot:
             time.sleep(dt)
             continue
-        vertices = compute_static_polygon_bretl(contacts)
-        gui_handles['bretl'] = draw_com_polygon(vertices, cyan)
+        try:
+            vertices = compute_static_polygon_bretl(contacts)
+            gui_handles['bretl'] = draw_com_polygon(vertices, cyan)
+        except Exception as e:
+            print "draw_bretl_thread:", e
+            continue
         time.sleep(1e-2)
 
 
@@ -141,8 +145,12 @@ def draw_cdd_only_thread():
         if freeze or screenshot:
             time.sleep(dt)
             continue
-        vertices = compute_static_polygon_cdd_only(contacts, robot_mass)
-        gui_handles['cdd_only'] = draw_com_polygon(vertices, black)
+        try:
+            vertices = compute_static_polygon_cdd_only(contacts, robot_mass)
+            gui_handles['cdd_only'] = draw_com_polygon(vertices, black)
+        except Exception as e:
+            print "draw_cdd_only_thread:", e
+            continue
         time.sleep(1e-2)
 
 
