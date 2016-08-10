@@ -58,9 +58,11 @@ if __name__ == "__main__":
         global cur_step, stance
         if fsm.cur_stance.is_double_support:
             staircase[cur_step].set_transparency(0.5)
+            staircase[cur_step].set_color('r')
             cur_step += 1
         else:
             staircase[(cur_step + 1) % len(staircase)].set_transparency(0)
+            staircase[(cur_step + 1) % len(staircase)].set_color('g')
         fsm.step()
         if not fsm.cur_stance.is_double_support:
             start_com.set_pos(fsm.cur_stance.com)
@@ -71,7 +73,9 @@ if __name__ == "__main__":
 
     cur_step = 0
     staircase[cur_step].set_transparency(0)
+    staircase[cur_step].set_color('g')
     staircase[cur_step + 1].set_transparency(0)  # starting in DS-R
+    staircase[cur_step + 1].set_color('g')
     next_step()
 
     t = threading.Thread(target=draw_tube_thread, args=())
