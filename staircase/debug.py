@@ -23,7 +23,6 @@ def draw_tube_thread():
         try:
             tube = TrajectoryTube(
                 start_com.p, end_com.p, fsm.cur_stance, 6)
-            tube.compute_dual_cone()
             handles = [
                 tube.draw_primal_polytope(),
                 tube.draw_dual_cone()]

@@ -65,16 +65,15 @@ def reduce_polar_system(B, c):
     return [array([0, 0, g])] + vertices_at(z=-g)
 
 
-class TrajectoryTube(object):
+class COMTube(object):
 
     LINE = 2
-    PYRAMID = 5
     DIAMOND = 6
     BRICK = 8
 
-    SHAPES = [LINE, PYRAMID, DIAMOND, BRICK]
+    SHAPES = [LINE, DIAMOND, BRICK]
 
-    def __init__(self, init_com, target_com, init_stance, shape,
+    def __init__(self, init_com, target_com, init_stance, target_stance, shape,
                  section_size=0.02):
         """
         Create a new COM trajectory tube.
@@ -92,7 +91,7 @@ class TrajectoryTube(object):
             We are assuming that self.init_stance applies to all vertices of the
             tube. See the paper for a discussion of this technical choice.
         """
-        assert shape in TrajectoryTube.SHAPES
+        assert shape in COMTube.SHAPES
         self._cone_vertices = None
         self._vertices = None
         self.delta = target_com - init_com
@@ -132,17 +131,15 @@ class TrajectoryTube(object):
             (-self.section_size, -self.section_size)]]
         tube_start = self.init_com - 0.05 * self.delta
         tube_end = self.target_com + 0.05 * self.delta
-        if self.shape == TrajectoryTube.BRICK:
+        if self.shape == COMTube.BRICK:
             vertices = \
                 [tube_start + s for s in square] + \
                 [tube_end + s for s in square]
-        elif self.shape == TrajectoryTube.PYRAMID:
-            vertices = [tube_start] + [tube_end + s for s in square]
-        elif self.shape == TrajectoryTube.DIAMOND:
+        elif self.shape == COMTube.DIAMOND:
             tube_mid = 0.5 * tube_start + 0.5 * tube_end
             vertices = [tube_start] + \
                 [tube_mid + s for s in square] + [tube_end]
-        else:  # default is TrajectoryTube.LINE
+        else:  # default is COMTube.LINE
             vertices = [tube_start, tube_end]
         return vertices
 
@@ -172,7 +169,7 @@ class TrajectoryTube(object):
     """
 
     def compute_dual_vrep(self):
-        A_O = self.init_stance.get_cwc_pyparma([0, 0, 0])
+        A_O = self.init_stance.cwc  # CWC at world origin
         gravity = pymanoid.get_gravity()
         B_list, c_list = [], []
         for (i, v) in enumerate(self.vertices):
@@ -197,7 +194,7 @@ class TrajectoryTube(object):
 
     def draw_dual_cone(self, scale=0.1):
         if not self._cone_vertices:
-            return None
+            self._cone_vertices = self.compute_dual_vrep()
         apex = self.target_com
         vscale = [apex + scale * array(v) for v in self._cone_vertices]
         return draw_3d_cone(  # recall that self.cone_vertices[0] is [0, 0, +g]
