@@ -27,10 +27,6 @@ from pymanoid.polyhedra import Polytope
 from scipy.spatial.qhull import QhullError
 from warnings import warn
 
-# import time
-# from numpy import average, std
-# comp_times = []
-
 
 def normalize(v):
     return v / sqrt(dot(v, v))
