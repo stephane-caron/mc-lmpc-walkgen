@@ -79,7 +79,7 @@ class StanceFSM(object):
         'SS-R': 'DS-L'
     }
 
-    def __init__(self, contacts, com, init_state, ss_duration, ds_duration,
+    def __init__(self, contacts, com, init_phase, ss_duration, ds_duration,
                  init_com_offset=None, cyclic=False):
         """
         Create a new finite state machine.
@@ -88,7 +88,7 @@ class StanceFSM(object):
 
         - ``contacts`` -- sequence of contacts
         - ``com`` -- PointMass object giving the current position of the COM
-        - ``init_state`` -- string giving the initial FSM state
+        - ``init_phase`` -- string giving the initial FSM state
         - ``ss_duration`` -- duration of single-support phases
         - ``ds_duration`` -- duration of double-support phases
 
@@ -96,24 +96,25 @@ class StanceFSM(object):
 
             This function updates the position of ``com`` as a side effect.
         """
-        assert init_state in ['DS-L', 'DS-R']  # kron
-        first_stance = Stance(init_state, contacts[0], contacts[1])
+        assert init_phase in ['DS-L', 'DS-R']  # kron
+        first_stance = Stance(init_phase, contacts[0], contacts[1])
         if init_com_offset is not None:
             first_stance.com += init_com_offset
         com.set_pos(first_stance.com)
+        self._next_stance = None
         self.com = com
         self.contacts = contacts
+        self.cur_phase = init_phase
         self.cur_stance = first_stance
         self.cyclic = cyclic
         self.ds_duration = ds_duration
         self.free_foot = FreeLimb(visible=False, color='c')
         self.left_foot_traj_handles = []
         self.nb_contacts = len(contacts)
-        self.next_contact_id = 2 if init_state == 'DS-R' else 3  # kroooon
+        self.next_contact_id = 2 if init_phase == 'DS-R' else 3  # kroooon
         self.rem_time = 0.
         self.right_foot_traj_handles = []
         self.ss_duration = ss_duration
-        self.state = init_state
         self.state_time = 0.
         self.thread = None
         self.thread_lock = None
@@ -178,56 +179,60 @@ class StanceFSM(object):
 
     @property
     def next_duration(self):
-        if self.next_state.startswith('SS'):
+        if self.next_phase.startswith('SS'):
             return self.ss_duration
         return self.ds_duration
 
     @property
     def next_stance(self):
-        if self.next_state == 'SS-L':
+        if self._next_stance is not None:
+            return self._next_stance
+        if self.next_phase == 'SS-L':
             left_foot = self.cur_stance.left_foot
             right_foot = None
-        elif self.next_state == 'DS-R':
+        elif self.next_phase == 'DS-R':
             left_foot = self.cur_stance.left_foot
             right_foot = self.next_contact
-        elif self.next_state == 'SS-R':
+        elif self.next_phase == 'SS-R':
             left_foot = None
             right_foot = self.cur_stance.right_foot
-        elif self.next_state == 'DS-L':
+        elif self.next_phase == 'DS-L':
             left_foot = self.next_contact
             right_foot = self.cur_stance.right_foot
         else:  # should not happen
-            assert False, "Unknown state: %s" % self.next_state
-        return Stance(self.next_state, left_foot, right_foot)
+            assert False, "Unknown state: %s" % self.next_phase
+        self._next_stance = Stance(self.next_phase, left_foot, right_foot)
+        return self._next_stance
 
     @property
     def next_ss_stance(self):
         assert self.cur_stance.is_single_support
         t = self.transitions
         if self.cur_stance.left_foot is None:
-            return Stance(t[t[self.state]], self.next_contact, None)
+            return Stance(t[t[self.cur_phase]], self.next_contact, None)
         else:  # self.cur_stance.right_foot is None
-            return Stance(t[t[self.state]], None, self.next_contact)
+            return Stance(t[t[self.cur_phase]], None, self.next_contact)
 
     @property
-    def next_state(self):
-        return self.transitions[self.state]
+    def next_phase(self):
+        return self.transitions[self.cur_phase]
 
     def get_time_to_transition(self):
         return self.rem_time
 
     def step(self):
         next_stance = self.next_stance
-        next_state = self.next_state
-        if next_state.startswith('DS'):
+        next_phase = self.next_phase
+        if next_phase.startswith('DS'):
             self.next_contact_id += 1
             if self.next_contact_id >= self.nb_contacts:
                 if self.cyclic:
                     self.next_contact_id -= self.nb_contacts
                 elif self.thread_lock:  # thread is running
                     self.stop_thread()
+        self._next_stance = None
+        self.cur_phase = next_phase
         self.cur_stance = next_stance
-        self.state = next_state
 
     def get_preview_targets(self):
         time_to_transition = self.rem_time
