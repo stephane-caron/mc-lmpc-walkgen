@@ -18,7 +18,7 @@
 # You should have received a copy of the GNU General Public License along with
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
-from tube import TrajectoryTube
+from tube import COMTube
 from numpy import array, bmat, dot, eye, hstack, sqrt, vstack, zeros
 from pymanoid import PointMass, solve_qp
 from scipy.linalg import block_diag
@@ -224,10 +224,11 @@ class FeedbackPreviewController(object):
             cur_com = self.com_buffer.com.p
             cur_comd = self.com_buffer.comd
             cur_stance = self.fsm.cur_stance
+            target_stance = self.fsm.next_stance
             preview_horizon, target_com = self.fsm.get_preview_targets()
             self.target_box.set_pos(target_com)
-            tube = TrajectoryTube(
-                cur_com, target_com, cur_stance, self.tube_shape)
+            tube = COMTube(
+                cur_com, target_com, cur_stance, target_stance, self.tube_shape)
             if tube.nb_vertices < 2:
                 continue
             com_face = tube.compute_primal_hrep()
