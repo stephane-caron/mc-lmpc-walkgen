@@ -32,27 +32,37 @@ def norm(v):
 
 class PreviewControl(object):
 
+    """
+    Preview control for a system with linear dynamics:
+
+        x_{k+1} = A * x_k + B * u_k
+
+    subject to constraints:
+
+        for all k,   C(k) * u_k <= d(k)
+        for all k,   E(k) * x_k <= f(k)
+        x_0 = x_init
+
+    The output control law will minimize, by decreasing priority:
+
+        1)  |x_{nb_steps} - x_goal|^2
+        2)  sum_k |u_k|^2
+
+    Note that this is a weighted (not prioritized) minimization.
+    """
+
     def __init__(self, A, B, C, d, E, f, x_init, x_goal, nb_steps):
         """
-        Preview control for a system with linear dynamics:
-
-            x_{k+1} = A * x_k + B * u_k
-
-        subject to constraints:
-
-            for all k,   C * u_k <= d
-            for all k,   E * x_k <= f
-            x_0 = x_init
-            x_{nb_steps} = x_goal
+        Instantiate a new controller.
 
         INPUT:
 
         - ``A`` -- state linear dynamics matrix
         - ``B`` -- control linear dynamics matrix
-        - ``C`` -- H-representation matrix for control constraints
-        - ``d`` -- H-representation vector for control constraints
-        - ``E`` -- H-representation matrix for state constraints
-        - ``f`` -- H-representation vector for state constraints
+        - ``C`` -- map from k to H-rep matrix of control constraints
+        - ``d`` -- map from k to H-rep vector of control constraints
+        - ``E`` -- map from k to H-rep matrix of state constraints
+        - ``f`` -- map from k to H-rep vector of state constraints
         - ``x_init`` -- initial state
         - ``x_goal`` -- goal state
         - ``nb_steps`` -- number of discretized time steps
@@ -101,8 +111,8 @@ class PreviewControl(object):
             # Here: x_k = phi * x_init + psi * U
             # State inequality: E * x_k <= f
             # that is, (E * psi) * U <= f - (E * phi) * x_init
-            G.append(dot(self.E, psi))
-            h.append(self.f - dot(dot(self.E, phi), self.x_init))
+            G.append(dot(self.E(k), psi))
+            h.append(self.f(k) - dot(dot(self.E(k), phi), self.x_init))
 
             # Now we update phi and psi for iteration k + 1
             phi = dot(self.A, phi)
@@ -131,25 +141,46 @@ class PreviewControl(object):
         q = w1 * q1 + w2 * q2
 
         # Inequality constraints
-        G_control = block_diag(*[self.C for _ in xrange(self.nb_steps)])
-        h_control = hstack([self.d for _ in xrange(self.nb_steps)])
+        G_control = block_diag(*[self.C(k) for k in xrange(self.nb_steps)])
+        h_control = hstack([self.d(k) for k in xrange(self.nb_steps)])
         G = vstack([G_control, self.G_state])
         h = hstack([h_control, self.h_state])
 
         self.U = solve_qp(P, q, G, h)
-        # e = dot(A, self.U) - b
-        # self.end_cost = dot(e, e)
 
 
 class COMAccelPreviewControl(PreviewControl):
 
-    def __init__(self, com_init, comd_init, com_goal, comd_goal, com_face,
-                 comdd_face, duration, nb_steps):
+    def __init__(self, com_init, comd_init, com_goal, comd_goal, tube1, tube2,
+                 duration, switch_time, nb_steps):
+        dT = duration / nb_steps
+        switch_step = int(switch_time / dT)
+        C1, d1 = tube1.compute_dual_hrep()
+        C2, d2 = tube2.compute_dual_hrep()
+        E1_pos, f1 = tube1.compute_primal_hrep()
+        E2_pos, f2 = tube2.compute_primal_hrep()
+        E1 = hstack([E1_pos, zeros(E1_pos.shape)])
+        E2 = hstack([E2_pos, zeros(E2_pos.shape)])
+
         assert com_init.shape[0] == 3
         assert com_goal.shape[0] == 3
         assert comd_init.shape[0] == 3
         assert comd_goal.shape[0] == 3
-        dT = duration / nb_steps
+        assert C1.shape[1] == 3, "C1.shape = %s" % str(C1.shape)
+        assert E1.shape[1] == 6, "E1.shape = %s" % str(E1.shape)
+
+        def C(k):
+            return C1 if k <= switch_step else C2
+
+        def d(k):
+            return d1 if k <= switch_step else d2
+
+        def E(k):
+            return E1 if k <= switch_step else E2
+
+        def f(k):
+            return f1 if k <= switch_step else f2
+
         I, Z = eye(3), zeros((3, 3))
         A = array(bmat([
             [I, dT * I],
@@ -157,11 +188,6 @@ class COMAccelPreviewControl(PreviewControl):
         B = array(bmat([
             [.5 * dT ** 2 * I],
             [dT * I]]))
-        C, d = comdd_face
-        E_pos, f = com_face
-        E = hstack([E_pos, zeros(E_pos.shape)])
-        assert C.shape[1] == 3, "C.shape = %s" % str(C.shape)
-        assert E.shape[1] == 6, "E.shape = %s" % str(E.shape)
         x_init = hstack([com_init, comd_init])
         x_goal = hstack([com_goal, comd_goal])
         super(COMAccelPreviewControl, self).__init__(
