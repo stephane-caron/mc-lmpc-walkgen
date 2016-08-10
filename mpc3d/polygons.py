@@ -28,10 +28,10 @@ def compute_polygon_hull(B, c):
 
         B * x <= c
 
-    The origin [0, 0] should lie inside the polygon (c >= 0) in order to build
-    the polar form. This case can always be reached if there is a solution by
-    translating to an interior point of the polygon. (This function will not
-    compute the interior point automatically.)
+    where x is a 2D vector. The origin [0, 0] should lie inside the polygon (c
+    >= 0) in order to build the polar form. This case can always be reached if
+    there is a solution by translating to an interior point of the polygon.
+    (This function will not compute the interior point automatically.)
 
     INPUT:
 

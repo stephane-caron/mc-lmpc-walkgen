@@ -72,6 +72,8 @@ class TrajectoryTube(object):
     DIAMOND = 6
     BRICK = 8
 
+    SHAPES = [LINE, PYRAMID, DIAMOND, BRICK]
+
     def __init__(self, init_com, target_com, init_stance, shape,
                  section_size=0.02):
         """
@@ -90,34 +92,46 @@ class TrajectoryTube(object):
             We are assuming that self.init_stance applies to all vertices of the
             tube. See the paper for a discussion of this technical choice.
         """
-        assert shape in [
-            TrajectoryTube.BRICK,
-            TrajectoryTube.PYRAMID,
-            TrajectoryTube.DIAMOND,
-            TrajectoryTube.LINE]
-        delta = target_com - init_com
+        assert shape in TrajectoryTube.SHAPES
+        self._cone_vertices = None
+        self._vertices = None
+        self.delta = target_com - init_com
         self.init_com = init_com
         self.init_stance = init_stance
+        self.section_size = section_size
         self.shape = shape
         self.target_com = target_com
-        if dot(delta, delta) < 1e-6:
-            self.vertices = [init_com]
-        else:
-            self.vertices = self.compute_vertices(delta, section_size)
 
-    def compute_vertices(self, delta, section_size):
-        n = normalize(delta)
+    """
+    Primal polytope
+    ===============
+    """
+
+    @property
+    def vertices(self):
+        if self._vertices is None:
+            self._vertices = self.compute_primal_vrep()
+        return self._vertices
+
+    @property
+    def nb_vertices(self):
+        return len(self.vertices)
+
+    def compute_primal_vrep(self):
+        if dot(self.delta, self.delta) < 1e-6:
+            return [self.init_com]
+        n = normalize(self.delta)
         t = array([0., 0., 1.])
         t -= dot(t, n) * n
         t = normalize(t)
         b = cross(n, t)
         square = [dx * t + dy * b for (dx, dy) in [
-            (+section_size, +section_size),
-            (+section_size, -section_size),
-            (-section_size, +section_size),
-            (-section_size, -section_size)]]
-        tube_start = self.init_com - 0.05 * delta
-        tube_end = self.target_com + 0.05 * delta
+            (+self.section_size, +self.section_size),
+            (+self.section_size, -self.section_size),
+            (-self.section_size, +self.section_size),
+            (-self.section_size, -self.section_size)]]
+        tube_start = self.init_com - 0.05 * self.delta
+        tube_end = self.target_com + 0.05 * self.delta
         if self.shape == TrajectoryTube.BRICK:
             vertices = \
                 [tube_start + s for s in square] + \
@@ -132,24 +146,7 @@ class TrajectoryTube(object):
             vertices = [tube_start, tube_end]
         return vertices
 
-    @property
-    def nb_vertices(self):
-        return len(self.vertices)
-
-    def compute_bare_dual_cone(self):
-        A_O = self.init_stance.get_cwc_pyparma([0, 0, 0])
-        gravity = pymanoid.get_gravity()
-        B_list, c_list = [], []
-        for (i, v) in enumerate(self.vertices):
-            B = A_O[:, :3] + cross(A_O[:, 3:], v)
-            c = dot(B, gravity)
-            B_list.append(B)
-            c_list.append(c)
-        B = vstack(B_list)
-        c = hstack(c_list)
-        return (B, c)
-
-    def compute_primal_polytope(self):
+    def compute_primal_hrep(self):
         """
         Compute the primal representation of the tube, i.e. the H-representation
         of its Euclidean polytope.
@@ -160,24 +157,6 @@ class TrajectoryTube(object):
         """
         return Polytope.hrep(self.vertices)
 
-    def compute_dual_cone(self):
-        # t0 = time.time()
-        B0, c0 = self.compute_bare_dual_cone()
-        self.cone_vertices = reduce_polar_system(B0, c0)
-        try:
-            B_new, c_new = Polytope.hrep(self.cone_vertices)
-            # comp_times.append(time.time() - t0)
-            # if len(comp_times) % 10 == 0:
-            #     print "%d (%d):\t%.1f +/- %.1f" % (
-            #         self._shape, len(comp_times),
-            #         1000 * average(comp_times),
-            #         1000 * std(comp_times))
-            B, c = (B_new.astype(float64), c_new.astype(float64))
-            return (B, c)
-        except:
-            warn("Polytope.hrep(cone_vertices) failed")
-            return None
-
     def draw_primal_polytope(self):
         if not self.vertices:
             return None
@@ -187,11 +166,39 @@ class TrajectoryTube(object):
                 linewidth=5)
         return draw_polyhedron(self.vertices, 'c.-#')
 
+    """
+    Dual cone
+    =========
+    """
+
+    def compute_dual_vrep(self):
+        A_O = self.init_stance.get_cwc_pyparma([0, 0, 0])
+        gravity = pymanoid.get_gravity()
+        B_list, c_list = [], []
+        for (i, v) in enumerate(self.vertices):
+            B = A_O[:, :3] + cross(A_O[:, 3:], v)
+            c = dot(B, gravity)
+            B_list.append(B)
+            c_list.append(c)
+        B = vstack(B_list)
+        c = hstack(c_list)
+        return reduce_polar_system(B, c)
+
+    def compute_dual_hrep(self):
+        if not self._cone_vertices:
+            self._cone_vertices = self.compute_dual_vrep()
+        try:
+            B_new, c_new = Polytope.hrep(self._cone_vertices)
+            B, c = (B_new.astype(float64), c_new.astype(float64))
+            return (B, c)
+        except:
+            warn("Polytope.hrep(cone_vertices) failed")
+            return None
+
     def draw_dual_cone(self, scale=0.1):
-        if not self.cone_vertices:
+        if not self._cone_vertices:
             return None
         apex = self.target_com
-        vscale = [apex + scale * array(v) for v in self.cone_vertices]
-        # remember that self.cone_vertices[0] is [0, 0, +g]
-        return draw_3d_cone(
+        vscale = [apex + scale * array(v) for v in self._cone_vertices]
+        return draw_3d_cone(  # recall that self.cone_vertices[0] is [0, 0, +g]
             apex=apex, axis=[0, 0, 1], section=vscale[1:])

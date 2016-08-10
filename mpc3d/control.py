@@ -220,7 +220,6 @@ class FeedbackPreviewController(object):
 
     def run_thread(self):
         target_comd = zeros(3)
-        i = 0
         while self.thread_lock:
             cur_com = self.com_buffer.com.p
             cur_comd = self.com_buffer.comd
@@ -231,8 +230,8 @@ class FeedbackPreviewController(object):
                 cur_com, target_com, cur_stance, self.tube_shape)
             if tube.nb_vertices < 2:
                 continue
-            com_face = tube.compute_primal_polytope()
-            comdd_face = tube.compute_dual_cone()
+            com_face = tube.compute_primal_hrep()
+            comdd_face = tube.compute_dual_hrep()
             A, b = com_face
             assert all(dot(A, cur_com) <= b), "haha!"
             if comdd_face is None:
@@ -251,19 +250,3 @@ class FeedbackPreviewController(object):
             except ValueError as e:
                 warn("MPC failed: inconsistent constraints?")
                 print e
-                i += 1
-                if i > 10:
-                    print "cur_com =", repr(cur_com)
-                    print "cur_comd =", repr(cur_comd)
-                    print "target_com =", repr(target_com)
-                    print "target_comd =", repr(repr(target_comd))
-                    print "com_face =", com_face
-                    print "\t", tube.vertices
-                    print "comdd_face =", comdd_face
-                    print "\t", tube.cone_vertices
-                    print "preview_horizon =", preview_horizon
-                    print "nb_steps =", self.nb_mpc_steps
-                    print ""
-                    print "cur_stance.left_foot", cur_stance.left_foot
-                    print "cur_stance.right_foot", cur_stance.right_foot
-                    break
