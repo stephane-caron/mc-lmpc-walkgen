@@ -18,8 +18,11 @@
 # You should have received a copy of the GNU General Public License along with
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import division
 from numpy import array, hstack
 from scipy.spatial import ConvexHull
+from shapely.geometry import LineString as ShapelyLineString
+from shapely.geometry import Polygon as ShapelyPolygon
 
 
 def compute_polygon_hull(B, c):
@@ -64,3 +67,63 @@ def compute_polygon_hull(B, c):
     hull = ConvexHull([row for row in B_polar], qhull_options='Pp')
     vertices = [axis_intersection(i, j) for (i, j) in hull.simplices]
     return vertices
+
+
+def intersect_line_polygon0(line, vertices):
+    """
+    Intersect a line segment with a polygon.
+
+    INPUT:
+
+    - ``line`` -- list of two points
+    - ``vertices`` -- vertices of the polygon
+
+    OUTPUT:
+
+    Returns a numpy array of shape (2,).
+    """
+    def in_line(p):
+        for q in line:
+            if abs(p[0] - q[0]) < 1e-5 and abs(p[1] - q[1]) < 1e-5:
+                return True
+        return False
+
+    s_polygon = ShapelyPolygon(vertices)
+    s_line = ShapelyLineString(line)
+    try:
+        coords = (array(p) for p in s_polygon.intersection(s_line).coords)
+        coords = [p for p in coords if not in_line(p)]
+    except NotImplementedError:
+        coords = []
+    return coords
+
+
+def intersect_line_polygon(p1, p2, points):
+    def line(p1, p2):
+        A = (p1[1] - p2[1])
+        B = (p2[0] - p1[0])
+        C = (p1[0]*p2[1] - p2[0]*p1[1])
+        return A, B, -C
+
+    def intersection(L1, L2):
+        D = L1[0] * L2[1] - L1[1] * L2[0]
+        Dx = L1[2] * L2[1] - L1[1] * L2[2]
+        Dy = L1[0] * L2[2] - L1[2] * L2[0]
+        if D != 0:
+            x = Dx / D
+            y = Dy / D
+            return x, y
+        else:
+            return None
+
+    hull = ConvexHull(points)
+    vertices = array([points[i] for i in hull.vertices])
+    n = len(vertices)
+    L1 = line(p1, p2)
+    for i, v1 in enumerate(vertices):
+        v2 = vertices[(i + 1) % n]
+        L2 = line(v1, v2)
+        p = intersection(L1, L2)
+        if p is not None:
+            return array(p)
+    return []
