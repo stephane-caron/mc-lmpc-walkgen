@@ -20,18 +20,13 @@
 
 import pymanoid
 
-from cwc import compute_cwc_pyparma
-from numpy import arange, dot, hstack
+from numpy import arange, hstack
 from pymanoid import draw_line
 from pymanoid.rotations import quat_slerp
 from pymanoid.rotations import rotation_matrix_from_quat
+from stance import Stance
 from threading import Lock, Thread
 from time import sleep as real_sleep
-
-try:
-    from hrp4_pymanoid import HRP4 as RobotModel
-except ImportError:
-    from pymanoid.robots import JVRC1 as RobotModel
 
 
 def pose_interp(pose0, pose1, t):
@@ -73,37 +68,6 @@ class FreeLimb(pymanoid.Contact):
         pos = (1. - y) * pose0[4:] + y * pose1[4:]
         quat = quat_slerp(pose0[:4], pose1[:4], y)
         self.set_pose(hstack([quat, pos]))
-
-
-class Stance(pymanoid.ContactSet):
-
-    def __init__(self, state, left_foot=None, right_foot=None):
-        contacts = {}
-        if left_foot:
-            contacts['left_foot'] = left_foot
-        if right_foot:
-            contacts['right_foot'] = right_foot
-        foot = left_foot if state[-1] == 'L' else right_foot
-        self.com = foot.p + [0., 0., RobotModel.leg_length]
-        self.cwc_pyparma = None
-        self.state = state
-        self.left_foot = left_foot
-        self.right_foot = right_foot
-        super(Stance, self).__init__(contacts)
-
-    @property
-    def is_double_support(self):
-        return self.state.startswith('DS')
-
-    @property
-    def is_single_support(self):
-        return self.state.startswith('SS')
-
-    def get_cwc_pyparma(self, p):
-        assert dot(p, p) < 1e-6  # for now, compute all at worl origin
-        if self.cwc_pyparma is None:
-            self.cwc_pyparma = compute_cwc_pyparma(self, p)
-        return self.cwc_pyparma
 
 
 class StanceFSM(object):
