@@ -18,7 +18,7 @@
 # You should have received a copy of the GNU General Public License along with
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
-from tube import COMTube
+from tube import compute_com_tubes
 from numpy import array, bmat, dot, eye, hstack, sqrt, vstack, zeros
 from pymanoid import PointMass, solve_qp
 from scipy.linalg import block_diag

@@ -99,6 +99,24 @@ def intersect_line_polygon0(line, vertices):
 
 
 def intersect_line_polygon(p1, p2, points):
+    """
+    Returns the first intersection found between [p1, p2] and a polygon.
+
+    INPUT:
+
+    - ``p1`` -- end point of line segment
+    - ``p2`` -- end point of line segment
+    - ``points`` -- vertices of the polygon
+
+    OUTPUT:
+
+    An intersection point if found, None otherwise.
+
+    .. NOTE::
+
+        Adapted from <http://stackoverflow.com/a/20679579>. This variant
+        %timeits around 90 us on my machine, vs. 150 us when using shapely.
+    """
     def line(p1, p2):
         A = (p1[1] - p2[1])
         B = (p2[0] - p1[0])
@@ -109,21 +127,23 @@ def intersect_line_polygon(p1, p2, points):
         D = L1[0] * L2[1] - L1[1] * L2[0]
         Dx = L1[2] * L2[1] - L1[1] * L2[2]
         Dy = L1[0] * L2[2] - L1[2] * L2[0]
-        if D != 0:
-            x = Dx / D
-            y = Dy / D
-            return x, y
-        else:
+        if abs(D) < 1e-5:
             return None
+        x = Dx / D
+        y = Dy / D
+        return x, y
 
     hull = ConvexHull(points)
     vertices = array([points[i] for i in hull.vertices])
     n = len(vertices)
     L1 = line(p1, p2)
+    x_min, x_max = min(p1[0], p2[0]), max(p1[0], p2[0])
+    y_min, y_max = min(p1[1], p2[1]), max(p1[1], p2[1])
     for i, v1 in enumerate(vertices):
         v2 = vertices[(i + 1) % n]
         L2 = line(v1, v2)
         p = intersection(L1, L2)
         if p is not None:
-            return array(p)
-    return []
+            if x_min < p[0] < x_max and y_min < p[1] < y_max:
+                return array(p)
+    return None
