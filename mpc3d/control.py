@@ -199,8 +199,8 @@ class FeedbackPreviewController(object):
         self.draw_cone = True
 
     def hide_cone(self):
-        self.draw_cone = False
-        self.cone_handle = None
+        self.draw_cones = False
+        self.cone_handles = None
 
     def start_thread(self):
         self.thread_lock = Lock()
@@ -224,29 +224,38 @@ class FeedbackPreviewController(object):
             cur_com = self.com_buffer.com.p
             cur_comd = self.com_buffer.comd
             cur_stance = self.fsm.cur_stance
-            target_stance = self.fsm.next_stance
+            next_stance = self.fsm.next_stance
             preview_horizon, target_com = self.fsm.get_preview_targets()
             self.target_box.set_pos(target_com)
-            tube = COMTube(
-                cur_com, target_com, cur_stance, target_stance, self.tube_shape)
-            if tube.nb_vertices < 2:
+            tube1, tube2 = compute_com_tubes(
+                cur_com, target_com, cur_stance, next_stance)
+            if tube1.nb_vertices < 2:
+                warn("Tube 1 is empty")
                 continue
-            com_face = tube.compute_primal_hrep()
-            comdd_face = tube.compute_dual_hrep()
-            A, b = com_face
-            assert all(dot(A, cur_com) <= b), "haha!"
-            if comdd_face is None:
+            elif tube2.nb_vertices < 2:
+                warn("Tube 2 is empty")
                 continue
+            # if comdd_face is None:
+            #     continue
             if self.draw_cone:
-                self.cone_handle = tube.draw_dual_cone()
+                self.cone_handles = [
+                    tube1.draw_dual_cone(),
+                    tube2.draw_dual_cone()]
             if self.draw_tube:
-                self.tube_handle = tube.draw_primal_polytope()
+                self.tube_handles = [
+                    tube1.draw_primal_polytope(),
+                    tube2.draw_primal_polytope()]
             try:
                 preview_control = COMAccelPreviewControl(
-                    cur_com, cur_comd,
-                    target_com, target_comd,
-                    com_face, comdd_face,
-                    preview_horizon, nb_steps=self.nb_mpc_steps)
+                    cur_com,
+                    cur_comd,
+                    target_com,
+                    target_comd,
+                    tube1,
+                    tube2,
+                    preview_horizon,
+                    self.fsm.rem_time,
+                    self.nb_mpc_steps)
                 self.com_buffer.update_control(preview_control)
             except ValueError as e:
                 warn("MPC failed: inconsistent constraints?")

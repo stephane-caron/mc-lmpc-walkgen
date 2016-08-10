@@ -186,6 +186,7 @@ class StanceFSM(object):
     @property
     def next_stance(self):
         if self._next_stance is not None:
+            # internal save to avoid useless CWC/SEP recomputations
             return self._next_stance
         if self.next_phase == 'SS-L':
             left_foot = self.cur_stance.left_foot

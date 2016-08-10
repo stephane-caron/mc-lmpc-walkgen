@@ -11,23 +11,44 @@ sys.path.append(os.path.dirname(script_path) + '/../pymanoid')
 
 import pymanoid
 from numpy import array
-from pymanoid import PointMass
-from mpc3d.tube import TrajectoryTube
+from pymanoid import PointMass, draw_polygon
+from mpc3d.tube import compute_com_tubes
 from mpc3d.fsm import StanceFSM
+from mpc3d.polygons import intersect_line_cylinder
 from walk import generate_staircase, set_camera_0
+
+
+gui_handles = {}
+tube_shape = 8
+tube_size = 0.04
 
 
 def draw_tube_thread():
     handles = []
+    mid_com_point = PointMass([0, 0, 0], 10)
     while True:
-        try:
-            tube = TrajectoryTube(
-                start_com.p, end_com.p, fsm.cur_stance, 6)
+        ss_stance = \
+            fsm.cur_stance if fsm.cur_stance.is_single_support \
+            else fsm.next_stance
+        mid_com = intersect_line_cylinder(start_com.p, end_com.p, ss_stance.sep)
+        if mid_com is not None:
+            mid_com_point.set_pos(mid_com)
+            mid_com_point.set_visible(True)
+        else:
+            mid_com_point.set_visible(False)
+        tube1, tube2 = compute_com_tubes(
+            start_com.p, end_com.p, fsm.cur_stance, fsm.next_stance,
+            tube_shape, tube_size)
+        if tube1 == tube2:
             handles = [
-                tube.draw_primal_polytope(),
-                tube.draw_dual_cone()]
-        except Exception as e:
-            print e
+                tube1.draw_primal_polytope(color='c'),
+                tube1.draw_dual_cone()]
+        else:
+            handles = [
+                tube1.draw_primal_polytope(color='c'),
+                tube1.draw_dual_cone(),
+                tube2.draw_primal_polytope(color='m'),
+                tube2.draw_dual_cone()]
     return handles
 
 
@@ -64,12 +85,17 @@ if __name__ == "__main__":
             staircase[(cur_step + 1) % len(staircase)].set_transparency(0)
             staircase[(cur_step + 1) % len(staircase)].set_color('g')
         fsm.step()
-        if not fsm.cur_stance.is_double_support:
+        _, com_target = fsm.get_preview_targets()
+        if fsm.cur_stance.is_single_support:
             start_com.set_pos(fsm.cur_stance.com)
-            delta = fsm.next_ss_stance.com - start_com.p
-            end_com.set_pos(start_com.p + 0.05 * delta)
-        else:
-            end_com.set_pos(fsm.next_stance.com)
+        end_com.set_pos(com_target)
+        ss_stance = \
+            fsm.cur_stance if fsm.cur_stance.is_single_support \
+            else fsm.next_stance
+        vertices = ss_stance.sep
+        gui_handles['static'] = draw_polygon(
+            [(x[0], x[1], start_com.z) for x in vertices],
+            normal=[0, 0, 1])
 
     cur_step = 0
     staircase[cur_step].set_transparency(0)

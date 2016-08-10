@@ -19,10 +19,14 @@
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import division
-from numpy import array, hstack
+from numpy import array, dot, hstack, sqrt
 from scipy.spatial import ConvexHull
 from shapely.geometry import LineString as ShapelyLineString
 from shapely.geometry import Polygon as ShapelyPolygon
+
+
+def norm(v):
+    return sqrt(dot(v, v))
 
 
 def compute_polygon_hull(B, c):
@@ -104,8 +108,8 @@ def intersect_line_polygon(p1, p2, points):
 
     INPUT:
 
-    - ``p1`` -- end point of line segment
-    - ``p2`` -- end point of line segment
+    - ``p1`` -- end point of line segment (2D or 3D)
+    - ``p2`` -- end point of line segment (2D or 3D)
     - ``points`` -- vertices of the polygon
 
     OUTPUT:
@@ -134,7 +138,7 @@ def intersect_line_polygon(p1, p2, points):
         return x, y
 
     hull = ConvexHull(points)
-    vertices = array([points[i] for i in hull.vertices])
+    vertices = [points[i] for i in hull.vertices]
     n = len(vertices)
     L1 = line(p1, p2)
     x_min, x_max = min(p1[0], p2[0]), max(p1[0], p2[0])
@@ -144,6 +148,36 @@ def intersect_line_polygon(p1, p2, points):
         L2 = line(v1, v2)
         p = intersection(L1, L2)
         if p is not None:
-            if x_min < p[0] < x_max and y_min < p[1] < y_max:
-                return array(p)
+            if not (x_min <= p[0] <= x_max and y_min <= p[1] <= y_max):
+                continue
+            vx_min, vx_max = min(v1[0], v2[0]), max(v1[0], v2[0])
+            vy_min, vy_max = min(v1[1], v2[1]), max(v1[1], v2[1])
+            if not (vx_min <= p[0] <= vx_max and vy_min <= p[1] <= vy_max):
+                continue
+            return array(p)
     return None
+
+
+def intersect_line_cylinder(p1, p2, points):
+    """
+    Intersect the line segment [p1, p2] with a vertical cylinder of polygonal
+    cross-section.
+
+    INPUT:
+
+    - ``p1`` -- 3D end point of line segment
+    - ``p2`` -- 3D end point of line segment
+    - ``points`` -- 2D vertices of the polygon
+
+    OUTPUT:
+
+    An intersection point if found, None otherwise.
+    """
+    p = intersect_line_polygon(p1, p2, points)
+    if p is None:
+        return None
+    p1 = array(p1)
+    p2 = array(p2)
+    alpha = norm(p - p1[:2]) / norm(p2[:2] - p1[:2])
+    z = p1[2] + alpha * (p2[2] - p1[2])
+    return array([p[0], p[1], z])

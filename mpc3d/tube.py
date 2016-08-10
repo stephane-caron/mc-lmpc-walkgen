@@ -21,7 +21,7 @@
 import pymanoid
 
 from numpy import array, cross, dot, float64, hstack, ones, sqrt, vstack
-from polygons import compute_polygon_hull
+from polygons import compute_polygon_hull, intersect_line_cylinder
 from pymanoid.draw import draw_3d_cone, draw_line, draw_polyhedron
 from pymanoid.polyhedra import Polytope
 from scipy.spatial.qhull import QhullError
@@ -65,12 +65,12 @@ class COMTube(object):
 
     LINE = 2
     DIAMOND = 6
-    BRICK = 8
+    PARALLELEPIPED = 8
 
-    SHAPES = [LINE, DIAMOND, BRICK]
+    SHAPES = [LINE, DIAMOND, PARALLELEPIPED]
 
-    def __init__(self, init_com, target_com, init_stance, target_stance, shape,
-                 section_size=0.02):
+    def __init__(self, init_com, target_com, init_stance, shape, size,
+                 start_margin=True, end_margin=True):
         """
         Create a new COM trajectory tube.
 
@@ -80,7 +80,9 @@ class COMTube(object):
         - ``target_com`` -- end position of the COM
         - ``init_stance`` -- stance used to compute the contact wrench cone
         - ``shape`` -- number of vertices of the tube (2, 6 or 8)
-        - ``section_size`` -- side of the cross-section square for ``shape`` > 2
+        - ``size`` -- side of the cross-section square (for ``shape`` > 2)
+        - ``start_margin`` -- safety margin at start
+        - ``end_margin`` -- safety margin at end
 
         .. NOTE::
 
@@ -91,10 +93,12 @@ class COMTube(object):
         self._cone_vertices = None
         self._vertices = None
         self.delta = target_com - init_com
+        self.end_margin = end_margin
         self.init_com = init_com
         self.init_stance = init_stance
-        self.section_size = section_size
         self.shape = shape
+        self.size = size
+        self.start_margin = start_margin
         self.target_com = target_com
 
     """
@@ -121,13 +125,17 @@ class COMTube(object):
         t = normalize(t)
         b = cross(n, t)
         square = [dx * t + dy * b for (dx, dy) in [
-            (+self.section_size, +self.section_size),
-            (+self.section_size, -self.section_size),
-            (-self.section_size, +self.section_size),
-            (-self.section_size, -self.section_size)]]
-        tube_start = self.init_com - 0.05 * self.delta
-        tube_end = self.target_com + 0.05 * self.delta
-        if self.shape == COMTube.BRICK:
+            (+self.size, +self.size),
+            (+self.size, -self.size),
+            (-self.size, +self.size),
+            (-self.size, -self.size)]]
+        tube_start = self.init_com
+        if self.start_margin:
+            tube_start -= 0.05 * self.delta
+        tube_end = self.target_com
+        if self.end_margin:
+            tube_end += 0.05 * self.delta
+        if self.shape == COMTube.PARALLELEPIPED:
             vertices = \
                 [tube_start + s for s in square] + \
                 [tube_end + s for s in square]
@@ -150,14 +158,14 @@ class COMTube(object):
         """
         return Polytope.hrep(self.vertices)
 
-    def draw_primal_polytope(self):
+    def draw_primal_polytope(self, color='c'):
         if not self.vertices:
             return None
         elif len(self.vertices) == 2:
             return draw_line(
                 self.vertices[0], self.vertices[1], color=[0., 0.5, 0.5],
                 linewidth=5)
-        return draw_polyhedron(self.vertices, 'c.-#')
+        return draw_polyhedron(self.vertices, '%c.-#' % color)
 
     """
     Dual cone
@@ -195,3 +203,21 @@ class COMTube(object):
         vscale = [apex + scale * array(v) for v in self._cone_vertices]
         return draw_3d_cone(  # recall that self.cone_vertices[0] is [0, 0, +g]
             apex=apex, axis=[0, 0, 1], section=vscale[1:])
+
+
+def compute_com_tubes(cur_com, target_com, cur_stance, next_stance, shape,
+                      size):
+    ss_stance = cur_stance if cur_stance.is_single_support else next_stance
+    mid_com = intersect_line_cylinder(cur_com, target_com, ss_stance.sep)
+    if mid_com is None:
+        # assuming cur_com is in the SEP, no intersection means that both COM
+        # are inside the polygon
+        tube = COMTube(cur_com, target_com, cur_stance, shape, size)
+        return (tube, tube)
+    u = normalize(target_com - cur_com)
+    epsilon = (-1 if cur_stance.is_single_support else +1) * 1.5 * size
+    mid_com += epsilon * u  # heuristic so that the SS tube lies inside the SEP
+    tube1 = COMTube(cur_com, mid_com, cur_stance, shape, size, end_margin=False)
+    tube2 = COMTube(mid_com, target_com, next_stance, shape, size,
+                    start_margin=False)
+    return (tube1, tube2)

@@ -39,6 +39,7 @@ class Stance(pymanoid.ContactSet):
         foot = left_foot if state[-1] == 'L' else right_foot
         self.com = foot.p + [0., 0., RobotModel.leg_length]
         self._cwc = None
+        self._sep = None
         self.state = state
         self.left_foot = left_foot
         self.right_foot = right_foot
@@ -64,5 +65,5 @@ class Stance(pymanoid.ContactSet):
         """Static-equilibrium polygon as list of vertices"""
         if self._sep is None:
             m = RobotModel.mass  # however, the SEP does not depend on this
-            self._sep = self.cur_stance.compute_static_equilibrium_area(m)
+            self._sep = self.compute_static_equilibrium_area(m)
         return self._sep
