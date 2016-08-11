@@ -292,23 +292,21 @@ class FeedbackPreviewController(object):
                     switch_time, self.nb_mpc_steps)
             except TubeError as e:
                 print "Tube error: %s" % str(e)
+                continue
+            preview_control.compute_dynamics()
+            try:
+                preview_control.compute_control()
+                self.com_buffer.update_control(preview_control)
+            except ValueError as e:
+                warn("MPC: QP solver failed, inconsistent constraints?")
+                fail = True
+                print "fsm.cur_stance.is_single_support =", \
+                    self.fsm.cur_stance.is_single_support
                 self.fsm.stop_thread()
                 self.com_buffer.stop_thread()
                 self.stop_thread()
-                continue
-            preview_control.compute_dynamics()
-            preview_control.compute_control()
-            self.com_buffer.update_control(preview_control)
+                print "Exception:", e
             if self.draw_cone:
                 self.cone_handle = tube.draw_dual_cones()
             if self.draw_tube:
                 self.tube_handle = tube.draw_primal_polytopes()
-            # except ValueError as e:
-            #     warn("MPC failed: inconsistent constraints?")
-            #     fail = True
-            #     print "fsm.cur_stance.is_single_support =", \
-            #         self.fsm.cur_stance.is_single_support
-            #     self.fsm.stop_thread()
-            #     self.com_buffer.stop_thread()
-            #     self.stop_thread()
-            #     print "Exception:", e

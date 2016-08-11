@@ -152,7 +152,7 @@ def prepare_screenshot(scrot_time=38.175):
     mpc.target_box.hide()
     # mpc.tube_handle.SetShow(False)
     com_buffer.com.set_visible(False)
-    com_buffer.comdd_handle.Close()
+    # com_buffer.comdd_handle.Close()
     robot.set_transparency(0)
     viewer.SetBkgndColor([1, 1, 1])
     dash_graph_handles(fsm.left_foot_traj_handles)

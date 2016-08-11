@@ -25,7 +25,6 @@ from polygons import compute_polygon_hull, intersect_line_cylinder
 from pymanoid.draw import draw_3d_cone, draw_line, draw_polyhedron
 from pymanoid.polyhedra import Polytope
 from scipy.spatial.qhull import QhullError
-# from warnings import warn
 
 
 class TubeError(Exception):
@@ -101,6 +100,7 @@ class COMTube(object):
         self.target_com = target_com
         self.target_stance = target_stance
 
+        # all other computations depend on the primal V-rep:
         self.compute_primal_vrep()
 
     """
@@ -150,12 +150,16 @@ class COMTube(object):
                 return
             if self.start_stance.is_single_support:
                 mid_vertex = start_vertex + 0.95 * (mid_vertex - start_vertex)
+                vertices0.append(start_vertex)
+                vertices0.append(mid_vertex)
+                vertices1.append(start_vertex)
+                vertices1.append(end_vertex)
             else:  # self.target_stance.is_single_support
                 mid_vertex = end_vertex + 0.95 * (mid_vertex - end_vertex)
-            vertices0.append(start_vertex)
-            vertices0.append(mid_vertex)
-            vertices1.append(mid_vertex)
-            vertices1.append(end_vertex)
+                vertices0.append(start_vertex)
+                vertices0.append(end_vertex)
+                vertices1.append(mid_vertex)
+                vertices1.append(end_vertex)
         self._single_polytope = False
         self._vertices = {0: vertices0, 1: vertices1}
 

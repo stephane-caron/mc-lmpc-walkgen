@@ -171,7 +171,8 @@ class StanceFSM(object):
 
                     while not is_inside_next_com_polygon(self.com.p):
                         sleep_fun(dt)
-                self.step()
+                if self.thread_lock is not None:  # DEBUG -- TODO: remove
+                    self.step()
 
     @property
     def next_contact(self):

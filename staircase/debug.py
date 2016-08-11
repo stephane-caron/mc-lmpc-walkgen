@@ -12,7 +12,7 @@ sys.path.append(os.path.dirname(script_path) + '/../pymanoid')
 import pymanoid
 from numpy import array
 from pymanoid import PointMass, draw_polygon
-from mpc3d.tube import COMTube
+from mpc3d.tube import COMTube, TubeError
 from mpc3d.fsm import StanceFSM
 from walk import generate_staircase, set_camera_0
 
@@ -27,12 +27,15 @@ tube_radius = 0.04
 def draw_tube_thread():
     handles = []
     while True:
-        tube = COMTube(
-            start_com.p, end_com.p, fsm.cur_stance, fsm.next_stance, tube_shape,
-            tube_radius)
-        handles = [
-            tube.draw_primal_polytopes(),
-            tube.draw_dual_cones()]
+        try:
+            tube = COMTube(
+                start_com.p, end_com.p, fsm.cur_stance, fsm.next_stance,
+                tube_shape, tube_radius)
+            handles = [
+                tube.draw_primal_polytopes(),
+                tube.draw_dual_cones()]
+        except TubeError as e:
+            print "TubeError:", e
         start_com_sep.set_pos([start_com.x, start_com.y, sep_height])
         end_com_sep.set_pos([end_com.x, end_com.y, sep_height])
     return handles
@@ -73,7 +76,7 @@ if __name__ == "__main__":
             staircase[(cur_step + 1) % len(staircase)].set_transparency(0)
             staircase[(cur_step + 1) % len(staircase)].set_color('g')
         fsm.step()
-        _, com_target = fsm.get_preview_targets()
+        _, _, com_target = fsm.get_preview_targets()
         if fsm.cur_stance.is_single_support:
             start_com.set_pos(fsm.cur_stance.com)
         end_com.set_pos(com_target)
