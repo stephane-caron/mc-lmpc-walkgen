@@ -168,7 +168,7 @@ def fsm_post_step_callback():
     else:  # fsm.cur_stance.is_double_support:
         ss_stance = fsm.next_stance
         ds_stance = fsm.cur_stance
-    sep_height = com_buffer.cur_height
+    sep_height = com_buffer.cur_height - 0.5
     gui_handles['static-ss'] = draw_polygon(
         [(x[0], x[1], sep_height) for x in ss_stance.sep],
         normal=[0, 0, 1], color='c')
