@@ -25,7 +25,11 @@ from polygons import compute_polygon_hull, intersect_line_cylinder
 from pymanoid.draw import draw_3d_cone, draw_line, draw_polyhedron
 from pymanoid.polyhedra import Polytope
 from scipy.spatial.qhull import QhullError
-from warnings import warn
+# from warnings import warn
+
+
+class TubeError(Exception):
+    pass
 
 
 def normalize(v):
@@ -48,14 +52,10 @@ def reduce_polar_system(B, c):
         (B[:, column] / sigma).reshape((B.shape[0], 1))
         for column in [0, 1]])
 
-    try:
-        vertices1d = compute_polygon_hull(B2, ones(len(c)))
-    except QhullError:
-        warn("QhullError: maybe output polygon was empty?")
-        return []
+    vertices2d = compute_polygon_hull(B2, ones(len(c)))
 
     def vertices_at(z):
-        v = [array([a * (g - z), b * (g - z)]) for (a, b) in vertices1d]
+        v = [array([a * (g - z), b * (g - z)]) for (a, b) in vertices2d]
         return [array([x, y, z]) for (x, y) in v]
 
     return [array([0, 0, g])] + vertices_at(z=-g)
@@ -70,7 +70,7 @@ class COMTube(object):
     SHAPES = [LINE, PARALLELEPIPED]
 
     def __init__(self, start_com, target_com, start_stance, target_stance,
-                 shape, radius, start_margin=True, end_margin=True):
+                 shape, radius, safety_margin=0.02):
         """
         Create a new COM trajectory tube.
 
@@ -81,8 +81,8 @@ class COMTube(object):
         - ``start_stance`` -- stance used to compute the contact wrench cone
         - ``shape`` -- number of vertices of the tube (2, 6 or 8)
         - ``radius`` -- side of the cross-section square (for ``shape`` > 2)
-        - ``start_margin`` -- safety margin at start
-        - ``end_margin`` -- safety margin at end
+        - ``safety_margin`` -- safety margin (in [m]) around start and end COM
+                               positions (default: 0.02)
 
         .. NOTE::
 
@@ -92,13 +92,11 @@ class COMTube(object):
         assert shape in COMTube.SHAPES
         self._cone_vertices = {}
         self._vertices = {}
-        self.delta = target_com - start_com
-        self.end_margin = end_margin
         self.radius = radius
+        self.safety_margin = safety_margin
         self.shape = shape
         self.single_polytope = False
         self.start_com = start_com
-        self.start_margin = start_margin
         self.start_stance = start_stance
         self.target_com = target_com
         self.target_stance = target_stance
@@ -111,9 +109,12 @@ class COMTube(object):
     """
 
     def compute_primal_vrep(self):
-        if dot(self.delta, self.delta) < 1e-6:
-            return [self.start_com]
-        n = normalize(self.delta)
+        delta = self.target_com - self.start_com
+        if dot(delta, delta) < 1e-6:
+            self._single_polytope = True
+            self._vertices = {0: [self.start_com], 1: [self.start_com]}
+            return
+        n = normalize(delta)
         t = array([0., 0., 1.])
         t -= dot(t, n) * n
         t = normalize(t)
@@ -126,13 +127,8 @@ class COMTube(object):
                 (-self.radius, -self.radius)]]
         else:  # self.shape == COMTube.LINE:
             cross_section = [zeros(3)]
-        tube_start = self.start_com
-        safety_margin = 0.02  # [m]
-        if self.start_margin:
-            tube_start -= safety_margin * n
-        tube_end = self.target_com
-        if self.end_margin:
-            tube_end += safety_margin * n
+        tube_start = self.start_com - self.safety_margin * n
+        tube_end = self.target_com + self.safety_margin * n
         if self.start_stance.is_single_support:
             sep = self.start_stance.sep
         else:  # self.target_stance.is_single_support:
@@ -181,9 +177,12 @@ class COMTube(object):
 
         A tuple (A, b) such that the H-representation is A * x <= b.
         """
-        if len(self._vertices) == 1:
-            return Polytope.hrep(self._vertices[0])
-        return Polytope.hrep(self._vertices[stance_id])
+        try:
+            if len(self._vertices) == 1:
+                return Polytope.hrep(self._vertices[0])
+            return Polytope.hrep(self._vertices[stance_id])
+        except RuntimeError as e:
+            raise TubeError("Could not compute primal hrep: %s" % str(e))
 
     def draw_primal_polytopes(self):
         """
@@ -194,7 +193,9 @@ class COMTube(object):
         GUI handles.
         """
         handles = []
-        colors = ['c', 'y'] if self._single_polytope else ['y', 'c']
+        colors = ['y', 'c']
+        if self.start_stance.is_single_support:
+            colors.reverse()
         for (stance_id, vlist) in self._vertices.iteritems():
             if stance_id > 0 and self._single_polytope:
                 break
@@ -238,7 +239,10 @@ class COMTube(object):
             c_list.append(c)
         B = vstack(B_list)
         c = hstack(c_list)
-        self._cone_vertices[stance_id] = reduce_polar_system(B, c)
+        try:
+            self._cone_vertices[stance_id] = reduce_polar_system(B, c)
+        except QhullError:
+            raise TubeError("Could not reduce polar of stance %d" % stance_id)
         return self._cone_vertices[stance_id]
 
     def compute_dual_hrep(self, stance_id):
@@ -254,13 +258,9 @@ class COMTube(object):
         Matrix of the dual cone halfspace representation.
         """
         cone_vertices = self.compute_dual_vrep(stance_id)
-        try:
-            B_new, c_new = Polytope.hrep(cone_vertices)
-            B, c = (B_new.astype(float64), c_new.astype(float64))
-            return (B, c)
-        except:
-            warn("Polytope.hrep(cone_vertices) failed")
-            return None
+        B_new, c_new = Polytope.hrep(cone_vertices)
+        B, c = (B_new.astype(float64), c_new.astype(float64))
+        return (B, c)
 
     def draw_dual_cones(self, scale=0.1):
         handles = []

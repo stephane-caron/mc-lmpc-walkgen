@@ -21,7 +21,7 @@ gui_handles = {}
 mass = 20.  # [kg], used for drawing scale
 sep_height = 0.
 tube_shape = 8
-tube_size = 0.04
+tube_radius = 0.04
 
 
 def draw_tube_thread():
@@ -29,7 +29,7 @@ def draw_tube_thread():
     while True:
         tube = COMTube(
             start_com.p, end_com.p, fsm.cur_stance, fsm.next_stance, tube_shape,
-            tube_size)
+            tube_radius)
         handles = [
             tube.draw_primal_polytopes(),
             tube.draw_dual_cones()]

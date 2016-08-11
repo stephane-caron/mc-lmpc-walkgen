@@ -205,14 +205,14 @@ class StanceFSM(object):
         self._next_stance = Stance(self.next_phase, left_foot, right_foot)
         return self._next_stance
 
-    @property
-    def next_ss_stance(self):
-        assert self.cur_stance.is_single_support
-        t = self.transitions
-        if self.cur_stance.left_foot is None:
-            return Stance(t[t[self.cur_phase]], self.next_contact, None)
-        else:  # self.cur_stance.right_foot is None
-            return Stance(t[t[self.cur_phase]], None, self.next_contact)
+    # @property
+    # def next_ss_stance(self):
+    #     assert self.cur_stance.is_single_support
+    #     t = self.transitions
+    #     if self.cur_stance.left_foot is None:
+    #         return Stance(t[t[self.cur_phase]], self.next_contact, None)
+    #     else:  # self.cur_stance.right_foot is None
+    #         return Stance(t[t[self.cur_phase]], None, self.next_contact)
 
     @property
     def next_phase(self):
@@ -242,11 +242,11 @@ class StanceFSM(object):
             horizon = time_to_transition \
                 + self.ds_duration \
                 + 0.5 * self.ss_duration
-            com_target = self.next_ss_stance.com
+            com_target = self.next_stance.com
         elif self.cur_stance.is_double_support:
             horizon = time_to_transition + 0.5 * self.ss_duration
             com_target = self.cur_stance.com
         else:  # single support with plenty of time ahead
             horizon = time_to_transition
             com_target = self.cur_stance.com
-        return (horizon, com_target)
+        return (time_to_transition, horizon, com_target)

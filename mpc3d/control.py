@@ -18,7 +18,7 @@
 # You should have received a copy of the GNU General Public License along with
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
-from tube import COMTube
+from tube import COMTube, TubeError
 from numpy import array, bmat, dot, eye, hstack, sqrt, vstack, zeros
 from pymanoid import PointMass, solve_qp
 from scipy.linalg import block_diag
@@ -67,22 +67,25 @@ class PreviewControl(object):
         - ``x_goal`` -- goal state
         - ``nb_steps`` -- number of discretized time steps
         """
+        u_dim = C(0).shape[1]
+        x_dim = x_init.shape[0]
         self.A = A
         self.B = B
         self.C = C
-        self.d = d
         self.E = E
+        self.G_state = None
+        self.U_dim = u_dim * nb_steps
+        self.X_dim = x_dim * nb_steps
+        self.d = d
         self.f = f
+        self.h_state = None
         self.nb_steps = nb_steps
-        self.u_dim = C.shape[1]
-        self.U_dim = self.u_dim * self.nb_steps
-        self.x_dim = x_init.shape[0]
-        self.X_dim = self.x_dim * self.nb_steps
+        self.phi_last = None
+        self.psi_last = None
+        self.u_dim = u_dim
+        self.x_dim = x_dim
         self.x_goal = x_goal
         self.x_init = x_init
-
-        self.compute_dynamics()
-        self.compute_control()
 
     def compute_dynamics(self):
         """
@@ -124,6 +127,9 @@ class PreviewControl(object):
         self.psi_last = psi
 
     def compute_control(self):
+        if self.psi_last is None:
+            self.compute_dynamics()
+
         # Cost 1: sum_k u_k^2
         P1 = eye(self.U_dim)
         q1 = zeros(self.U_dim)
@@ -145,6 +151,10 @@ class PreviewControl(object):
         h_control = hstack([self.d(k) for k in xrange(self.nb_steps)])
         G = vstack([G_control, self.G_state])
         h = hstack([h_control, self.h_state])
+        # G = G_control
+        # h = h_control
+        # G = self.G_state
+        # h = self.h_state
 
         self.U = solve_qp(P, q, G, h)
 
@@ -181,8 +191,8 @@ class COMAccelPreviewControl(PreviewControl):
                 return M1
             return M
 
-        C1, d1 = tube.compute_dual_hrep(phase=0)
-        E1_pos, f1 = tube.compute_primal_hrep(phase=0)
+        C1, d1 = tube.compute_dual_hrep(stance_id=0)
+        E1_pos, f1 = tube.compute_primal_hrep(stance_id=0)
         E1 = hstack([E1_pos, zeros(E1_pos.shape)])
         if switch_step >= nb_steps - 1:
             C = wrap_matrix(C1)
@@ -190,8 +200,8 @@ class COMAccelPreviewControl(PreviewControl):
             E = wrap_matrix(E1)
             f = wrap_matrix(f1)
         else:  #
-            C2, d2 = tube.compute_dual_hrep(phase=1)
-            E2_pos, f2 = tube.compute_primal_hrep(phase=1)
+            C2, d2 = tube.compute_dual_hrep(stance_id=1)
+            E2_pos, f2 = tube.compute_primal_hrep(stance_id=1)
             E2 = hstack([E2_pos, zeros(E2_pos.shape)])
             C = multiplex_matrices(C1, C2, switch_step)
             d = multiplex_matrices(d1, d2, switch_step)
@@ -224,6 +234,7 @@ class FeedbackPreviewController(object):
         self.target_box = PointMass(fsm.cur_stance.com, 30., color='g')
         self.thread = None
         self.thread_lock = None
+        self.tube_radius = tube_radius
         self.tube_shape = tube_shape
 
     def show_cone(self):
@@ -251,33 +262,53 @@ class FeedbackPreviewController(object):
 
     def run_thread(self):
         target_comd = zeros(3)
+        fail = False
         while self.thread_lock:
             cur_com = self.com_buffer.com.p
             cur_comd = self.com_buffer.comd
             cur_stance = self.fsm.cur_stance
             next_stance = self.fsm.next_stance
-            preview_horizon, target_com = self.fsm.get_preview_targets()
+            switch_time, horizon, target_com = self.fsm.get_preview_targets()
             self.target_box.set_pos(target_com)
             tube = COMTube(
                 cur_com, target_com, cur_stance, next_stance, self.tube_shape,
                 self.tube_radius)
-            # if comdd_face is None:
-            #     continue
-            if self.draw_cone:
-                self.cone_handle = tube.draw_dual_cone()
-            if self.draw_tube:
-                self.tube_handle = tube.draw_primal_polytope()
+            # try:
+            if not fail:
+                print "\ncur_com =", repr(cur_com)
+                print "cur_comd =", repr(cur_comd)
+                print "target_com =", repr(target_com)
+                print "target_comd =", repr(target_comd)
+                print "switch_time =", switch_time
+                print "horizon =", horizon
+                print ""
+                print "cur_stance.is_single_support =", \
+                    cur_stance.is_single_support
+                print "cur_stance.is_single_support =", \
+                    self.fsm.cur_stance.is_single_support
             try:
                 preview_control = COMAccelPreviewControl(
-                    cur_com,
-                    cur_comd,
-                    target_com,
-                    target_comd,
-                    tube,
-                    preview_horizon,
-                    self.fsm.rem_time,
-                    self.nb_mpc_steps)
-                self.com_buffer.update_control(preview_control)
-            except ValueError as e:
-                warn("MPC failed: inconsistent constraints?")
-                print e
+                    cur_com, cur_comd, target_com, target_comd, tube, horizon,
+                    switch_time, self.nb_mpc_steps)
+            except TubeError as e:
+                print "Tube error: %s" % str(e)
+                self.fsm.stop_thread()
+                self.com_buffer.stop_thread()
+                self.stop_thread()
+                continue
+            preview_control.compute_dynamics()
+            preview_control.compute_control()
+            self.com_buffer.update_control(preview_control)
+            if self.draw_cone:
+                self.cone_handle = tube.draw_dual_cones()
+            if self.draw_tube:
+                self.tube_handle = tube.draw_primal_polytopes()
+            # except ValueError as e:
+            #     warn("MPC failed: inconsistent constraints?")
+            #     fail = True
+            #     print "fsm.cur_stance.is_single_support =", \
+            #         self.fsm.cur_stance.is_single_support
+            #     self.fsm.stop_thread()
+            #     self.com_buffer.stop_thread()
+            #     self.stop_thread()
+            #     print "Exception:", e
