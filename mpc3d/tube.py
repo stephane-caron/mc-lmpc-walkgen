@@ -194,16 +194,16 @@ class COMTube(object):
         GUI handles.
         """
         handles = []
-        colors = ['c', 'y']
+        colors = ['c', 'y'] if self._single_polytope else ['y', 'c']
         for (stance_id, vlist) in self._vertices.iteritems():
             if stance_id > 0 and self._single_polytope:
                 break
             elif len(vlist) == 2:
-                handles.extend(draw_line(
+                handles.append(draw_line(
                     vlist[0], vlist[1], color=[0., 0.5, 0.5], linewidth=5))
             else:  # should be a full polytope
                 color = colors[stance_id]
-                handles.extend(draw_polyhedron(vlist, '%c.-#' % color))
+                handles.extend(draw_polyhedron(vlist, '%c.-' % color))
         return handles
 
     """
@@ -270,5 +270,6 @@ class COMTube(object):
             vscale = [apex + scale * array(v) for v in cone_vertices]
             handles.extend(draw_3d_cone(
                 # recall that cone_vertices[0] is [0, 0, +g]
-                apex=apex, axis=[0, 0, 1], section=vscale[1:]))
+                apex=apex, axis=[0, 0, 1], section=vscale[1:],
+                combined='r-'))
         return handles

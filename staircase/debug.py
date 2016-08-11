@@ -14,34 +14,27 @@ from numpy import array
 from pymanoid import PointMass, draw_polygon
 from mpc3d.tube import COMTube
 from mpc3d.fsm import StanceFSM
-from mpc3d.polygons import intersect_line_cylinder
 from walk import generate_staircase, set_camera_0
 
 
 gui_handles = {}
+mass = 20.  # [kg], used for drawing scale
+sep_height = 0.
 tube_shape = 8
 tube_size = 0.04
 
 
 def draw_tube_thread():
     handles = []
-    mid_com_point = PointMass([0, 0, 0], 10)
     while True:
-        ss_stance = \
-            fsm.cur_stance if fsm.cur_stance.is_single_support \
-            else fsm.next_stance
-        mid_com = intersect_line_cylinder(start_com.p, end_com.p, ss_stance.sep)
-        if mid_com is not None:
-            mid_com_point.set_pos(mid_com)
-            mid_com_point.set_visible(True)
-        else:
-            mid_com_point.set_visible(False)
         tube = COMTube(
             start_com.p, end_com.p, fsm.cur_stance, fsm.next_stance, tube_shape,
             tube_size)
         handles = [
             tube.draw_primal_polytopes(),
             tube.draw_dual_cones()]
+        start_com_sep.set_pos([start_com.x, start_com.y, sep_height])
+        end_com_sep.set_pos([end_com.x, end_com.y, sep_height])
     return handles
 
 
@@ -60,16 +53,18 @@ if __name__ == "__main__":
         contact.set_transparency(0.5)
     fsm = StanceFSM(
         staircase,
-        PointMass([0, 0, 0], 39., visible=False), 'DS-R',
+        PointMass([0, 0, 0], mass, visible=False), 'DS-R',
         ss_duration=1.0,
         ds_duration=0.5,
         init_com_offset=array([0.05, 0., 0.]),
         cyclic=True)
-    start_com = PointMass([0, 0, 0], 39, color='b')
-    end_com = PointMass([0, 0, 0], 39, color='g')
+    start_com = PointMass([0, 0, 0], mass, color='b')
+    end_com = PointMass([0, 0, 0], mass, color='g')
+    start_com_sep = PointMass([0, 0, 0], mass / 2., color='b')
+    end_com_sep = PointMass([0, 0, 0], mass / 2., color='g')
 
     def next_step():
-        global cur_step, stance
+        global cur_step, stance, sep_height
         if fsm.cur_stance.is_double_support:
             staircase[cur_step].set_transparency(0.5)
             staircase[cur_step].set_color('r')
@@ -82,13 +77,19 @@ if __name__ == "__main__":
         if fsm.cur_stance.is_single_support:
             start_com.set_pos(fsm.cur_stance.com)
         end_com.set_pos(com_target)
-        ss_stance = \
-            fsm.cur_stance if fsm.cur_stance.is_single_support \
-            else fsm.next_stance
-        vertices = ss_stance.sep
-        gui_handles['static'] = draw_polygon(
-            [(x[0], x[1], start_com.z) for x in vertices],
-            normal=[0, 0, 1])
+        if fsm.cur_stance.is_single_support:
+            ss_stance = fsm.cur_stance
+            ds_stance = fsm.next_stance
+        else:  # fsm.cur_stance.is_double_support:
+            ss_stance = fsm.next_stance
+            ds_stance = fsm.cur_stance
+        sep_height = start_com.z - 0.2
+        gui_handles['static-ss'] = draw_polygon(
+            [(x[0], x[1], sep_height) for x in ss_stance.sep],
+            normal=[0, 0, 1], color='c')
+        gui_handles['static-ds'] = draw_polygon(
+            [(x[0], x[1], sep_height) for x in ds_stance.sep],
+            normal=[0, 0, 1], color='y')
 
     cur_step = 0
     staircase[cur_step].set_transparency(0)
