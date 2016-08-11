@@ -21,7 +21,6 @@
 import pylab
 
 from numpy import zeros
-from pymanoid import draw_force
 from pymanoid import draw_line
 from threading import Lock, Thread
 from time import sleep as rt_sleep
@@ -40,7 +39,6 @@ class COMAccelBuffer(object):
         self.com_traj_handles = []
         self.comd = zeros(3)
         self.comdd = zeros(3)
-        self.comdd_handle = None
         self.comdd_index = 0
         self.comdd_traj = []
         self.comdd_vector = None
@@ -103,8 +101,6 @@ class COMAccelBuffer(object):
                 self.com_traj.append(self.com.p)
                 self.com_traj_handles.append(
                     draw_line(prev_com, self.com.p, color='b', linewidth=3))
-                self.comdd_handle = draw_force(
-                    self.com.p, comdd, scale=0.1)
                 self.comdd = comdd
                 self.comdd_traj.append(comdd)
                 sleep_fun(dT)
