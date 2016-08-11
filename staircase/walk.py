@@ -162,10 +162,19 @@ def prepare_screenshot(scrot_time=38.175):
 
 def fsm_post_step_callback():
     # (1) Update static-equilibrium polygon
-    vertices = fsm.cur_stance.compute_static_equilibrium_area(robot_mass)
-    gui_handles['static'] = draw_polygon(
-        [(x[0], x[1], com_buffer.cur_height) for x in vertices],
-        normal=[0, 0, 1])
+    if fsm.cur_stance.is_single_support:
+        ss_stance = fsm.cur_stance
+        ds_stance = fsm.next_stance
+    else:  # fsm.cur_stance.is_double_support:
+        ss_stance = fsm.next_stance
+        ds_stance = fsm.cur_stance
+    sep_height = com_buffer.cur_height
+    gui_handles['static-ss'] = draw_polygon(
+        [(x[0], x[1], sep_height) for x in ss_stance.sep],
+        normal=[0, 0, 1], color='c')
+    gui_handles['static-ds'] = draw_polygon(
+        [(x[0], x[1], sep_height) for x in ds_stance.sep],
+        normal=[0, 0, 1], color='y')
     # (2) Update IK tasks
     with robot_lock:
         robot.ik.remove_task(robot.left_foot.name)
