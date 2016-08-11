@@ -127,11 +127,12 @@ class COMTube(object):
         else:  # self.shape == COMTube.LINE:
             cross_section = [zeros(3)]
         tube_start = self.start_com
+        safety_margin = 0.02  # [m]
         if self.start_margin:
-            tube_start -= 0.05 * self.delta
+            tube_start -= safety_margin * n
         tube_end = self.target_com
         if self.end_margin:
-            tube_end += 0.05 * self.delta
+            tube_end += safety_margin * n
         if self.start_stance.is_single_support:
             sep = self.start_stance.sep
         else:  # self.target_stance.is_single_support:
@@ -140,7 +141,8 @@ class COMTube(object):
         for s in cross_section:
             start_vertex = tube_start + s
             end_vertex = tube_end + s
-            mid_vertex = intersect_line_cylinder(start_vertex, end_vertex, sep)
+            # NB: the order in the intersection matters, see function doc
+            mid_vertex = intersect_line_cylinder(end_vertex, start_vertex, sep)
             if mid_vertex is None:
                 # assuming that start_vertex is in the SEP, no intersection
                 # means that both COM are inside the polygon
@@ -150,7 +152,10 @@ class COMTube(object):
                 self._single_polytope = True
                 self._vertices = {0: vertices, 1: vertices}
                 return
-            mid_vertex = start_vertex + 0.95 * (mid_vertex - start_vertex)
+            if self.start_stance.is_single_support:
+                mid_vertex = start_vertex + 0.95 * (mid_vertex - start_vertex)
+            else:  # self.target_stance.is_single_support
+                mid_vertex = end_vertex + 0.95 * (mid_vertex - end_vertex)
             vertices0.append(start_vertex)
             vertices0.append(mid_vertex)
             vertices1.append(mid_vertex)
