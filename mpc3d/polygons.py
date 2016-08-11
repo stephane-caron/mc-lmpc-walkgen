@@ -68,7 +68,16 @@ def compute_polygon_hull(B, c):
         y = (bi[0] * aj - bj[0] * ai) * 1. / (bi[0] * bj[1] - bj[0] * bi[1])
         return array([x, y])
 
-    hull = ConvexHull([row for row in B_polar], qhull_options='Pp')
+    # QHULL OPTIONS:
+    #
+    # - ``Pp`` -- do not report precision problems
+    # - ``Q0`` -- no merging with C-0 and Qx
+    #
+    # ``Q0`` avoids [this bug](https://github.com/scipy/scipy/issues/6484).
+    # It slightly diminishes computation times (0.9 -> 0.8 ms on my machine)
+    # but raises QhullError at the first sight of precision errors.
+    #
+    hull = ConvexHull([row for row in B_polar], qhull_options='Pp Q0')
     vertices = [axis_intersection(i, j) for (i, j) in hull.simplices]
     return vertices
 
