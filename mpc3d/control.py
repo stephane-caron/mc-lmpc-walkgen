@@ -20,10 +20,13 @@
 
 from tube import COMTube, TubeError
 from numpy import array, bmat, dot, eye, hstack, sqrt, vstack, zeros
-from pymanoid import PointMass, solve_qp
+from pymanoid import PointMass, solve_qp, draw_arrow
+# from pymanoid.quadratic_programming import cvxopt_solve_qp
 from scipy.linalg import block_diag
 from threading import Lock, Thread
 from warnings import warn
+
+import time
 
 
 def norm(v):
@@ -156,7 +159,9 @@ class PreviewControl(object):
         # G = self.G_state
         # h = self.h_state
 
+        t0 = time.time()
         self.U = solve_qp(P, q, G, h)
+        print time.time() - t0
 
 
 class COMAccelPreviewControl(PreviewControl):
@@ -199,7 +204,7 @@ class COMAccelPreviewControl(PreviewControl):
             d = wrap_matrix(d1)
             E = wrap_matrix(E1)
             f = wrap_matrix(f1)
-        else:  #
+        else:
             C2, d2 = tube.compute_dual_hrep(stance_id=1)
             E2_pos, f2 = tube.compute_primal_hrep(stance_id=1)
             E2 = hstack([E2_pos, zeros(E2_pos.shape)])
@@ -273,7 +278,11 @@ class FeedbackPreviewController(object):
             tube = COMTube(
                 cur_com, target_com, cur_stance, next_stance, self.tube_shape,
                 self.tube_radius)
-            # try:
+            dt = 3e-2
+            if dot(cur_comd, cur_comd) > 1e-2:
+                self.comd_handle = draw_arrow(cur_com, cur_com + cur_comd * dt)
+            if not fail:
+                pass
             if not fail:
                 print "\ncur_com =", repr(cur_com)
                 print "cur_comd =", repr(cur_comd)
@@ -286,6 +295,9 @@ class FeedbackPreviewController(object):
                     cur_stance.is_single_support
                 print "cur_stance.is_single_support =", \
                     self.fsm.cur_stance.is_single_support
+            print ""
+            print "Tube polytopes:", tube._vertices
+            print ""
             try:
                 preview_control = COMAccelPreviewControl(
                     cur_com, cur_comd, target_com, target_comd, tube, horizon,
@@ -300,13 +312,14 @@ class FeedbackPreviewController(object):
             except ValueError as e:
                 warn("MPC: QP solver failed, inconsistent constraints?")
                 fail = True
-                print "fsm.cur_stance.is_single_support =", \
-                    self.fsm.cur_stance.is_single_support
                 self.fsm.stop_thread()
                 self.com_buffer.stop_thread()
                 self.stop_thread()
                 print "Exception:", e
-            if self.draw_cone:
-                self.cone_handle = tube.draw_dual_cones()
-            if self.draw_tube:
-                self.tube_handle = tube.draw_primal_polytopes()
+            try:
+                if self.draw_cone:
+                    self.cone_handle = tube.draw_dual_cones()
+                if self.draw_tube:
+                    self.tube_handle = tube.draw_primal_polytopes()
+            except TubeError as e:
+                print "Tube error (drawing): %s" % str(e)
