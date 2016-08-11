@@ -18,7 +18,7 @@
 # You should have received a copy of the GNU General Public License along with
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
-from tube import compute_com_tubes
+from tube import COMTube
 from numpy import array, bmat, dot, eye, hstack, sqrt, vstack, zeros
 from pymanoid import PointMass, solve_qp
 from scipy.linalg import block_diag
@@ -39,9 +39,9 @@ class PreviewControl(object):
 
     subject to constraints:
 
+        x_0 = x_init
         for all k,   C(k) * u_k <= d(k)
         for all k,   E(k) * x_k <= f(k)
-        x_0 = x_init
 
     The output control law will minimize, by decreasing priority:
 
@@ -151,36 +151,9 @@ class PreviewControl(object):
 
 class COMAccelPreviewControl(PreviewControl):
 
-    def __init__(self, com_init, comd_init, com_goal, comd_goal, tube1, tube2,
+    def __init__(self, com_init, comd_init, com_goal, comd_goal, tube,
                  duration, switch_time, nb_steps):
         dT = duration / nb_steps
-        switch_step = int(switch_time / dT)
-        C1, d1 = tube1.compute_dual_hrep()
-        C2, d2 = tube2.compute_dual_hrep()
-        E1_pos, f1 = tube1.compute_primal_hrep()
-        E2_pos, f2 = tube2.compute_primal_hrep()
-        E1 = hstack([E1_pos, zeros(E1_pos.shape)])
-        E2 = hstack([E2_pos, zeros(E2_pos.shape)])
-
-        assert com_init.shape[0] == 3
-        assert com_goal.shape[0] == 3
-        assert comd_init.shape[0] == 3
-        assert comd_goal.shape[0] == 3
-        assert C1.shape[1] == 3, "C1.shape = %s" % str(C1.shape)
-        assert E1.shape[1] == 6, "E1.shape = %s" % str(E1.shape)
-
-        def C(k):
-            return C1 if k <= switch_step else C2
-
-        def d(k):
-            return d1 if k <= switch_step else d2
-
-        def E(k):
-            return E1 if k <= switch_step else E2
-
-        def f(k):
-            return f1 if k <= switch_step else f2
-
         I, Z = eye(3), zeros((3, 3))
         A = array(bmat([
             [I, dT * I],
@@ -190,15 +163,46 @@ class COMAccelPreviewControl(PreviewControl):
             [dT * I]]))
         x_init = hstack([com_init, comd_init])
         x_goal = hstack([com_goal, comd_goal])
+        switch_step = int(switch_time / dT)
+        C, d, E, f = self.compute_inequalities(tube, switch_step, nb_steps)
         super(COMAccelPreviewControl, self).__init__(
             A, B, C, d, E, f, x_init, x_goal, nb_steps)
         self.duration = duration
         self.timestep = dT
 
+    def compute_inequalities(self, tube, switch_step, nb_steps):
+        def multiplex_matrices(M1, M2, switch_step):
+            def M(k):
+                return M1 if k <= switch_step else M2
+            return M
+
+        def wrap_matrix(M1):
+            def M(k):
+                return M1
+            return M
+
+        C1, d1 = tube.compute_dual_hrep(phase=0)
+        E1_pos, f1 = tube.compute_primal_hrep(phase=0)
+        E1 = hstack([E1_pos, zeros(E1_pos.shape)])
+        if switch_step >= nb_steps - 1:
+            C = wrap_matrix(C1)
+            d = wrap_matrix(d1)
+            E = wrap_matrix(E1)
+            f = wrap_matrix(f1)
+        else:  #
+            C2, d2 = tube.compute_dual_hrep(phase=1)
+            E2_pos, f2 = tube.compute_primal_hrep(phase=1)
+            E2 = hstack([E2_pos, zeros(E2_pos.shape)])
+            C = multiplex_matrices(C1, C2, switch_step)
+            d = multiplex_matrices(d1, d2, switch_step)
+            E = multiplex_matrices(E1, E2, switch_step)
+            f = multiplex_matrices(f1, f2, switch_step)
+        return (C, d, E, f)
+
 
 class FeedbackPreviewController(object):
 
-    def __init__(self, fsm, com_buffer, nb_mpc_steps, tube_shape,
+    def __init__(self, fsm, com_buffer, nb_mpc_steps, tube_shape, tube_radius,
                  draw_cone=True, draw_tube=True):
         """
         Create a new feedback controller that continuously runs the preview
@@ -210,6 +214,7 @@ class FeedbackPreviewController(object):
         - ``com_buffer`` -- COMAccelBuffer to send MPC outputs to
         - ``nb_mpc_steps`` -- discretization step of the preview window
         - ``tube_shape`` -- number of vertices of the COM trajectory tube
+        - ``tube_radius`` -- tube radius (in L1 norm)
         """
         self.com_buffer = com_buffer
         self.draw_cone = draw_cone
@@ -226,7 +231,7 @@ class FeedbackPreviewController(object):
 
     def hide_cone(self):
         self.draw_cones = False
-        self.cone_handles = None
+        self.cone_handle = None
 
     def start_thread(self):
         self.thread_lock = Lock()
@@ -253,32 +258,22 @@ class FeedbackPreviewController(object):
             next_stance = self.fsm.next_stance
             preview_horizon, target_com = self.fsm.get_preview_targets()
             self.target_box.set_pos(target_com)
-            tube1, tube2 = compute_com_tubes(
-                cur_com, target_com, cur_stance, next_stance)
-            if tube1.nb_vertices < 2:
-                warn("Tube 1 is empty")
-                continue
-            elif tube2.nb_vertices < 2:
-                warn("Tube 2 is empty")
-                continue
+            tube = COMTube(
+                cur_com, target_com, cur_stance, next_stance, self.tube_shape,
+                self.tube_radius)
             # if comdd_face is None:
             #     continue
             if self.draw_cone:
-                self.cone_handles = [
-                    tube1.draw_dual_cone(),
-                    tube2.draw_dual_cone()]
+                self.cone_handle = tube.draw_dual_cone()
             if self.draw_tube:
-                self.tube_handles = [
-                    tube1.draw_primal_polytope(),
-                    tube2.draw_primal_polytope()]
+                self.tube_handle = tube.draw_primal_polytope()
             try:
                 preview_control = COMAccelPreviewControl(
                     cur_com,
                     cur_comd,
                     target_com,
                     target_comd,
-                    tube1,
-                    tube2,
+                    tube,
                     preview_horizon,
                     self.fsm.rem_time,
                     self.nb_mpc_steps)

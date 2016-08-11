@@ -12,7 +12,7 @@ sys.path.append(os.path.dirname(script_path) + '/../pymanoid')
 import pymanoid
 from numpy import array
 from pymanoid import PointMass, draw_polygon
-from mpc3d.tube import compute_com_tubes
+from mpc3d.tube import COMTube
 from mpc3d.fsm import StanceFSM
 from mpc3d.polygons import intersect_line_cylinder
 from walk import generate_staircase, set_camera_0
@@ -36,19 +36,12 @@ def draw_tube_thread():
             mid_com_point.set_visible(True)
         else:
             mid_com_point.set_visible(False)
-        tube1, tube2 = compute_com_tubes(
-            start_com.p, end_com.p, fsm.cur_stance, fsm.next_stance,
-            tube_shape, tube_size)
-        if tube1 == tube2:
-            handles = [
-                tube1.draw_primal_polytope(color='c'),
-                tube1.draw_dual_cone()]
-        else:
-            handles = [
-                tube1.draw_primal_polytope(color='c'),
-                tube1.draw_dual_cone(),
-                tube2.draw_primal_polytope(color='m'),
-                tube2.draw_dual_cone()]
+        tube = COMTube(
+            start_com.p, end_com.p, fsm.cur_stance, fsm.next_stance, tube_shape,
+            tube_size)
+        handles = [
+            tube.draw_primal_polytopes(),
+            tube.draw_dual_cones()]
     return handles
 
 

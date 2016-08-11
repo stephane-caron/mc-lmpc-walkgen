@@ -20,7 +20,7 @@
 
 import pymanoid
 
-from numpy import array, cross, dot, float64, hstack, ones, sqrt, vstack
+from numpy import array, cross, dot, float64, hstack, ones, sqrt, vstack, zeros
 from polygons import compute_polygon_hull, intersect_line_cylinder
 from pymanoid.draw import draw_3d_cone, draw_line, draw_polyhedron
 from pymanoid.polyhedra import Polytope
@@ -49,13 +49,13 @@ def reduce_polar_system(B, c):
         for column in [0, 1]])
 
     try:
-        vertices2d = compute_polygon_hull(B2, ones(len(c)))
+        vertices1d = compute_polygon_hull(B2, ones(len(c)))
     except QhullError:
         warn("QhullError: maybe output polygon was empty?")
         return []
 
     def vertices_at(z):
-        v = [array([a * (g - z), b * (g - z)]) for (a, b) in vertices2d]
+        v = [array([a * (g - z), b * (g - z)]) for (a, b) in vertices1d]
         return [array([x, y, z]) for (x, y) in v]
 
     return [array([0, 0, g])] + vertices_at(z=-g)
@@ -64,160 +64,206 @@ def reduce_polar_system(B, c):
 class COMTube(object):
 
     LINE = 2
-    DIAMOND = 6
+    # DIAMOND = 6
     PARALLELEPIPED = 8
 
-    SHAPES = [LINE, DIAMOND, PARALLELEPIPED]
+    SHAPES = [LINE, PARALLELEPIPED]
 
-    def __init__(self, init_com, target_com, init_stance, shape, size,
-                 start_margin=True, end_margin=True):
+    def __init__(self, start_com, target_com, start_stance, target_stance,
+                 shape, radius, start_margin=True, end_margin=True):
         """
         Create a new COM trajectory tube.
 
         INPUT:
 
-        - ``init_com`` -- start position of the COM
+        - ``start_com`` -- start position of the COM
         - ``target_com`` -- end position of the COM
-        - ``init_stance`` -- stance used to compute the contact wrench cone
+        - ``start_stance`` -- stance used to compute the contact wrench cone
         - ``shape`` -- number of vertices of the tube (2, 6 or 8)
-        - ``size`` -- side of the cross-section square (for ``shape`` > 2)
+        - ``radius`` -- side of the cross-section square (for ``shape`` > 2)
         - ``start_margin`` -- safety margin at start
         - ``end_margin`` -- safety margin at end
 
         .. NOTE::
 
-            We are assuming that self.init_stance applies to all vertices of the
-            tube. See the paper for a discussion of this technical choice.
+            We are assuming that self.start_stance applies to all vertices of
+            the tube. See the paper for a discussion of this technical choice.
         """
         assert shape in COMTube.SHAPES
-        self._cone_vertices = None
-        self._vertices = None
-        self.delta = target_com - init_com
+        self._cone_vertices = {}
+        self._vertices = {}
+        self.delta = target_com - start_com
         self.end_margin = end_margin
-        self.init_com = init_com
-        self.init_stance = init_stance
+        self.radius = radius
         self.shape = shape
-        self.size = size
+        self.single_polytope = False
+        self.start_com = start_com
         self.start_margin = start_margin
+        self.start_stance = start_stance
         self.target_com = target_com
+        self.target_stance = target_stance
+
+        self.compute_primal_vrep()
 
     """
-    Primal polytope
-    ===============
+    Primal polytopes
+    ================
     """
-
-    @property
-    def vertices(self):
-        if self._vertices is None:
-            self._vertices = self.compute_primal_vrep()
-        return self._vertices
-
-    @property
-    def nb_vertices(self):
-        return len(self.vertices)
 
     def compute_primal_vrep(self):
         if dot(self.delta, self.delta) < 1e-6:
-            return [self.init_com]
+            return [self.start_com]
         n = normalize(self.delta)
         t = array([0., 0., 1.])
         t -= dot(t, n) * n
         t = normalize(t)
         b = cross(n, t)
-        square = [dx * t + dy * b for (dx, dy) in [
-            (+self.size, +self.size),
-            (+self.size, -self.size),
-            (-self.size, +self.size),
-            (-self.size, -self.size)]]
-        tube_start = self.init_com
+        if self.shape == COMTube.PARALLELEPIPED:
+            cross_section = [dx * t + dy * b for (dx, dy) in [
+                (+self.radius, +self.radius),
+                (+self.radius, -self.radius),
+                (-self.radius, +self.radius),
+                (-self.radius, -self.radius)]]
+        else:  # self.shape == COMTube.LINE:
+            cross_section = [zeros(3)]
+        tube_start = self.start_com
         if self.start_margin:
             tube_start -= 0.05 * self.delta
         tube_end = self.target_com
         if self.end_margin:
             tube_end += 0.05 * self.delta
-        if self.shape == COMTube.PARALLELEPIPED:
-            vertices = \
-                [tube_start + s for s in square] + \
-                [tube_end + s for s in square]
-        elif self.shape == COMTube.DIAMOND:
-            tube_mid = 0.5 * tube_start + 0.5 * tube_end
-            vertices = [tube_start] + \
-                [tube_mid + s for s in square] + [tube_end]
-        else:  # default is COMTube.LINE
-            vertices = [tube_start, tube_end]
-        return vertices
+        if self.start_stance.is_single_support:
+            sep = self.start_stance.sep
+        else:  # self.target_stance.is_single_support:
+            sep = self.target_stance.sep
+        vertices0, vertices1 = [], []
+        for s in cross_section:
+            start_vertex = tube_start + s
+            end_vertex = tube_end + s
+            mid_vertex = intersect_line_cylinder(start_vertex, end_vertex, sep)
+            if mid_vertex is None:
+                # assuming that start_vertex is in the SEP, no intersection
+                # means that both COM are inside the polygon
+                vertices = (
+                    [tube_start + s for s in cross_section] +
+                    [tube_end + s for s in cross_section])
+                self._single_polytope = True
+                self._vertices = {0: vertices, 1: vertices}
+                return
+            mid_vertex = start_vertex + 0.95 * (mid_vertex - start_vertex)
+            vertices0.append(start_vertex)
+            vertices0.append(mid_vertex)
+            vertices1.append(mid_vertex)
+            vertices1.append(end_vertex)
+        self._single_polytope = False
+        self._vertices = {0: vertices0, 1: vertices1}
 
-    def compute_primal_hrep(self):
+    def compute_polytope_center(self, stance_id):
+        V = array(self._vertices[stance_id])
+        n = len(self._vertices[stance_id])
+        return V.sum(axis=0) / n
+
+    def compute_primal_hrep(self, stance_id):
         """
         Compute the primal representation of the tube, i.e. the H-representation
         of its Euclidean polytope.
+
+        INPUT:
+
+        - ``stance_id`` -- 0 for start stance_id, 1 for end stance_id
 
         OUTPUT:
 
         A tuple (A, b) such that the H-representation is A * x <= b.
         """
-        return Polytope.hrep(self.vertices)
+        if len(self._vertices) == 1:
+            return Polytope.hrep(self._vertices[0])
+        return Polytope.hrep(self._vertices[stance_id])
 
-    def draw_primal_polytope(self, color='c'):
-        if not self.vertices:
-            return None
-        elif len(self.vertices) == 2:
-            return draw_line(
-                self.vertices[0], self.vertices[1], color=[0., 0.5, 0.5],
-                linewidth=5)
-        return draw_polyhedron(self.vertices, '%c.-#' % color)
+    def draw_primal_polytopes(self):
+        """
+        Draw polytopes for each stance.
+
+        OUTPUT:
+
+        GUI handles.
+        """
+        handles = []
+        colors = ['c', 'y']
+        for (stance_id, vlist) in self._vertices.iteritems():
+            if stance_id > 0 and self._single_polytope:
+                break
+            elif len(vlist) == 2:
+                handles.extend(draw_line(
+                    vlist[0], vlist[1], color=[0., 0.5, 0.5], linewidth=5))
+            else:  # should be a full polytope
+                color = colors[stance_id]
+                handles.extend(draw_polyhedron(vlist, '%c.-#' % color))
+        return handles
 
     """
     Dual cone
     =========
     """
 
-    def compute_dual_vrep(self):
-        A_O = self.init_stance.cwc  # CWC at world origin
+    def compute_dual_vrep(self, stance_id):
+        """
+        Compute vertices of dual COM acceleration cones.
+
+        INPUT:
+
+        - ``stance_id`` -- 0 for start stance_id, 1 for end stance_id
+
+        OUTPUT:
+
+        Dual cone in vertex representation. The first vertex is the apex [0, 0,
+        +g], while the following ones give the polygon of the cross section at
+        zdd = -g.
+        """
+        if stance_id in self._cone_vertices:
+            return self._cone_vertices[stance_id]
+        stance = self.start_stance if stance_id == 0 else self.target_stance
+        A_O = stance.cwc  # CWC at world origin
         gravity = pymanoid.get_gravity()
         B_list, c_list = [], []
-        for (i, v) in enumerate(self.vertices):
+        for (i, v) in enumerate(self._vertices[stance_id]):
             B = A_O[:, :3] + cross(A_O[:, 3:], v)
             c = dot(B, gravity)
             B_list.append(B)
             c_list.append(c)
         B = vstack(B_list)
         c = hstack(c_list)
-        return reduce_polar_system(B, c)
+        self._cone_vertices[stance_id] = reduce_polar_system(B, c)
+        return self._cone_vertices[stance_id]
 
-    def compute_dual_hrep(self):
-        if not self._cone_vertices:
-            self._cone_vertices = self.compute_dual_vrep()
+    def compute_dual_hrep(self, stance_id):
+        """
+        Compute the halfspace representation of dual COM acceleration cones.
+
+        INPUT:
+
+        - ``stance_id`` -- 0 for start stance_id, 1 for end stance_id
+
+        OUTPUT:
+
+        Matrix of the dual cone halfspace representation.
+        """
+        cone_vertices = self.compute_dual_vrep(stance_id)
         try:
-            B_new, c_new = Polytope.hrep(self._cone_vertices)
+            B_new, c_new = Polytope.hrep(cone_vertices)
             B, c = (B_new.astype(float64), c_new.astype(float64))
             return (B, c)
         except:
             warn("Polytope.hrep(cone_vertices) failed")
             return None
 
-    def draw_dual_cone(self, scale=0.1):
-        if not self._cone_vertices:
-            self._cone_vertices = self.compute_dual_vrep()
-        apex = self.target_com
-        vscale = [apex + scale * array(v) for v in self._cone_vertices]
-        return draw_3d_cone(  # recall that self.cone_vertices[0] is [0, 0, +g]
-            apex=apex, axis=[0, 0, 1], section=vscale[1:])
-
-
-def compute_com_tubes(cur_com, target_com, cur_stance, next_stance, shape,
-                      size):
-    ss_stance = cur_stance if cur_stance.is_single_support else next_stance
-    mid_com = intersect_line_cylinder(cur_com, target_com, ss_stance.sep)
-    if mid_com is None:
-        # assuming cur_com is in the SEP, no intersection means that both COM
-        # are inside the polygon
-        tube = COMTube(cur_com, target_com, cur_stance, shape, size)
-        return (tube, tube)
-    u = normalize(target_com - cur_com)
-    epsilon = (-1 if cur_stance.is_single_support else +1) * 1.5 * size
-    mid_com += epsilon * u  # heuristic so that the SS tube lies inside the SEP
-    tube1 = COMTube(cur_com, mid_com, cur_stance, shape, size, end_margin=False)
-    tube2 = COMTube(mid_com, target_com, next_stance, shape, size,
-                    start_margin=False)
-    return (tube1, tube2)
+    def draw_dual_cones(self, scale=0.1):
+        handles = []
+        for stance_id in [0, 1]:
+            apex = self.compute_polytope_center(stance_id)
+            cone_vertices = self.compute_dual_vrep(stance_id)
+            vscale = [apex + scale * array(v) for v in cone_vertices]
+            handles.extend(draw_3d_cone(
+                # recall that cone_vertices[0] is [0, 0, +g]
+                apex=apex, axis=[0, 0, 1], section=vscale[1:]))
+        return handles
