@@ -73,7 +73,7 @@ def compute_polygon_hull(B, c):
     return vertices
 
 
-def intersect_line_polygon0(line, vertices):
+def intersect_line_polygon_shapely(line, vertices):
     """
     Intersect a line segment with a polygon.
 
@@ -104,7 +104,8 @@ def intersect_line_polygon0(line, vertices):
 
 def intersect_line_polygon(p1, p2, points):
     """
-    Returns the first intersection found between [p1, p2] and a polygon.
+    Intersect the line segment [p1, p2] with a polygon. If the intersection has
+    two points, returns the one closest to p1.
 
     INPUT:
 
@@ -114,12 +115,12 @@ def intersect_line_polygon(p1, p2, points):
 
     OUTPUT:
 
-    An intersection point if found, None otherwise.
+    None if the intersection is empty, otherwise its point closest to p1.
 
     .. NOTE::
 
         Adapted from <http://stackoverflow.com/a/20679579>. This variant
-        %timeits around 90 us on my machine, vs. 150 us when using shapely.
+        %timeits around 90 us on my machine, vs. 170 us when using shapely.
     """
     def line(p1, p2):
         A = (p1[1] - p2[1])
@@ -137,12 +138,16 @@ def intersect_line_polygon(p1, p2, points):
         y = Dy / D
         return x, y
 
+    def l1_norm(p, q):
+        return abs(p[0] - q[0]) + abs(p[1] - q[1])
+
     hull = ConvexHull(points)
     vertices = [points[i] for i in hull.vertices]
     n = len(vertices)
     L1 = line(p1, p2)
     x_min, x_max = min(p1[0], p2[0]), max(p1[0], p2[0])
     y_min, y_max = min(p1[1], p2[1]), max(p1[1], p2[1])
+    closest_point = None
     for i, v1 in enumerate(vertices):
         v2 = vertices[(i + 1) % n]
         L2 = line(v1, v2)
@@ -154,14 +159,17 @@ def intersect_line_polygon(p1, p2, points):
             vy_min, vy_max = min(v1[1], v2[1]), max(v1[1], v2[1])
             if not (vx_min <= p[0] <= vx_max and vy_min <= p[1] <= vy_max):
                 continue
-            return array(p)
-    return None
+            if closest_point is None \
+                    or l1_norm(p, p1) < l1_norm(closest_point, p1):
+                closest_point = p
+    return array(closest_point) if closest_point else None
 
 
 def intersect_line_cylinder(p1, p2, points):
     """
     Intersect the line segment [p1, p2] with a vertical cylinder of polygonal
-    cross-section.
+    cross-section. If the intersection has two points, returns the one closest
+    to p1.
 
     INPUT:
 
@@ -171,7 +179,7 @@ def intersect_line_cylinder(p1, p2, points):
 
     OUTPUT:
 
-    An intersection point if found, None otherwise.
+    None if the intersection is empty, otherwise its point closest to p1.
     """
     p = intersect_line_polygon(p1, p2, points)
     if p is None:
