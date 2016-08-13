@@ -30,7 +30,7 @@ class COMAccelBuffer(object):
     execute them until the next update.
     """
 
-    def __init__(self, com, fsm):
+    def __init__(self, com, fsm, show_preview=True):
         self.com = com
         self.comd = zeros(3)
         self.comdd = zeros(3)
@@ -40,13 +40,10 @@ class COMAccelBuffer(object):
         self.fsm = fsm
         self.past_handles = []
         self.preview_handles = []
+        self.show_preview = show_preview
         self.thread = None
         self.thread_lock = Lock()
         self.timestep = 0.
-
-    @property
-    def cur_height(self):
-        return self.com.z
 
     def update_control(self, mpc):
         with self.comdd_lock:

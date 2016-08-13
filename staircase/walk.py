@@ -146,7 +146,7 @@ def update_sep():
     else:  # fsm.cur_stance.is_double_support:
         ss_stance = fsm.next_stance
         ds_stance = fsm.cur_stance
-    sep_height = com_buffer.cur_height - RobotModel.leg_length
+    sep_height = com_buffer.com.z - RobotModel.leg_length
     gui_handles['static-ss'] = draw_polygon(
         [(x[0], x[1], sep_height) for x in ss_stance.sep],
         normal=[0, 0, 1], color='c')
