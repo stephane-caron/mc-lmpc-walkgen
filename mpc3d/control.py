@@ -249,10 +249,10 @@ class FeedbackPreviewController(object):
         self.draw_cones = False
         self.cone_handle = None
 
-    def start_thread(self):
+    def start_thread(self, sim):
         self.thread_lock = Lock()
         self.thread = Thread(
-            target=self.run_thread, args=())
+            target=self.run_thread, args=(sim))
         self.thread.daemon = True
         self.thread.start()
 
@@ -265,10 +265,11 @@ class FeedbackPreviewController(object):
     def stop_thread(self):
         self.thread_lock = None
 
-    def run_thread(self):
+    def run_thread(self, sim):
         target_comd = zeros(3)
         fail = False
         while self.thread_lock:
+            sim.sync('control')
             cur_com = self.com_buffer.com.p
             cur_comd = self.com_buffer.comd
             cur_stance = self.fsm.cur_stance
@@ -281,8 +282,6 @@ class FeedbackPreviewController(object):
             dt = 3e-2
             if dot(cur_comd, cur_comd) > 1e-2:
                 self.comd_handle = draw_arrow(cur_com, cur_com + cur_comd * dt)
-            if not fail:
-                pass
             if not fail:
                 print "\ncur_com =", repr(cur_com)
                 print "cur_comd =", repr(cur_comd)

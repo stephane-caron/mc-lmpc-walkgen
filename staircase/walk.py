@@ -53,7 +53,6 @@ except ImportError:
     from pymanoid.robots import JVRC1 as RobotModel
 
 
-clock = threading.Event()
 gui_handles = {}
 robot_lock = threading.Lock()
 robot_mass = 39.  # [kg] updated after robot model is loaded
@@ -210,37 +209,30 @@ class PausableThread(Thread):
                 self.step()
 
 
-class Clock(PausableThread):
+class Simulation(object):
 
-    def __init__(self, dt, slowdown=1.):
+    def __init__(self, dt, slowdown=None):
         """
-        Create a new Clock thread.
+        Create a new simulation object.
 
         INPUT:
 
         - ``dt`` -- time interval between two ticks in simulation time
         - ``slowdown`` -- ratio from simulation time to real time
-
-        .. NOTE::
-
-            Slowdown is mostly used for debug. You can also stop the clock by
-            ``clock.stop()`` and step it by hand with ``clock.step()``.
         """
-        super(Clock, self).__init__()
-        self.__sleep_dt = slowdown * dt
-        self.dt = 1. / freq
-        self.freq = freq
+        self.__sleep_dt = slowdown * dt if slowdown else dt
+        self.dt = dt
         self.event = threading.Event()
-        self.tick = 0
+        self.start_time = time.time()
+        self.loop_start = {}
 
-    def wait_for_tick(self):
-        self.event.wait()
+    def pause(self):
+        self.event.clear()
 
-    def wait_for_tick_after(self, tick_id):
-        if self.tick == tick_id:
-            self.event.wait()
+    def resume(self):
+        self.event.set()
 
-    def sleep(self, dT):
+    def sleep(self, dT=None):
         """
         Delay execution for a duration ``dT`` in simulation time.
 
@@ -248,13 +240,37 @@ class Clock(PausableThread):
 
         - ``dT`` -- sleep duration in simulation time
         """
-        time.sleep(self.slowdown * dT)
+        if dT is None:
+            return time.sleep(self.__sleep_dt)
+        elif self.slowdown:
+            return time.sleep(self.slowdown * dT)
+        return time.sleep(dT)
 
     def step(self):
         self.event.set()
         self.event.clear()
-        self.tick += 1
-        time.sleep(self.__sleep_dt)
+
+    def sync(self, name):
+        """
+        Check that the loop of the process identified by ``name`` does not
+        execute faster than ``self.dt``.
+
+        INPUT:
+
+        - ``name`` -- identifier of caller thread
+        """
+        self.event.wait()
+        cur_time = self.time()
+        if name in self.loop_start:
+            sim_elapsed = cur_time - self.loop_start[name]
+            if sim_elapsed < self.dt:
+                self.sleep(self.dt - sim__elapsed)
+        self.loop_start[name] = cur_time
+
+    def time(self):
+        if self.slowdown:
+            return self.slowdown * (time.time() - self.start_time)
+        return time.time() - self.start_time
 
 
 class ForcesThread(PausableThread):
@@ -265,6 +281,7 @@ class ForcesThread(PausableThread):
 
     def step(self):
         """Find supporting contact forces at each COM acceleration update."""
+        sim.sync('forces')
         comdd = com_buffer.comdd
         gravity = pymanoid.get_gravity()
         wrench = hstack([robot_mass * (comdd - gravity), zeros(3)])
@@ -281,7 +298,6 @@ class ForcesThread(PausableThread):
             # let's keep epilepsy at bay
             viewer.SetBkgndColor([.6, .6, .8])
             self.last_bkgnd_switch = None
-        clock.wait()
 
 
 if __name__ == "__main__":
@@ -353,13 +369,13 @@ if __name__ == "__main__":
             robot.ik.add_task(
                 DOFTask(robot, robot.ROT_P, 0., gain=0.9, weight=0.5))
 
-    clock = Clock(dt=3e-2)
+    sim = Simulation(dt=3e-2)
 
     def start():
         global start_time
-        fsm.start_thread(clock, fsm_callback)
-        com_buffer.start_thread(clock)
-        mpc.start_thread(clock)
+        fsm.start_thread(sim, fsm_callback)
+        com_buffer.start_thread(sim)
+        mpc.start_thread(sim)
         robot.start_ik_thread(3e-2)
         start_time = time.time()
 
