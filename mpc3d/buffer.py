@@ -32,15 +32,14 @@ class COMAccelBuffer(object):
 
     def __init__(self, com, fsm):
         self.com = com
-        self.com_traj = []
-        self.com_traj_handles = []
         self.comd = zeros(3)
         self.comdd = zeros(3)
         self.comdd_index = 0
         self.comdd_lock = Lock()
-        self.comdd_traj = []
         self.comdd_vector = None
         self.fsm = fsm
+        self.past_handles = []
+        self.preview_handles = []
         self.thread = None
         self.thread_lock = Lock()
         self.timestep = 0.
@@ -101,7 +100,5 @@ class COMAccelBuffer(object):
         self.com.set_pos(com0 + self.comd * dt + comdd * .5 * dt ** 2)
         self.comd += comdd * dt
         self.comdd = comdd
-        self.com_traj.append(self.com.p)
-        self.com_traj_handles.append(
+        self.past_handles.append(
             draw_line(com0, self.com.p, color='b', linewidth=3))
-        self.comdd_traj.append(comdd)
