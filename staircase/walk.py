@@ -21,6 +21,8 @@
 import IPython
 import os.path
 import sys
+import time
+import threading
 
 try:
     import pymanoid
@@ -30,7 +32,7 @@ except ImportError:
     import pymanoid
 
 try:
-    from mpc3d.com_buffer import COMAccelBuffer
+    from mpc3d.buffer import COMAccelBuffer
     from mpc3d.control import FeedbackPreviewController
     from mpc3d.fsm import StanceFSM
 except ImportError:
@@ -44,9 +46,6 @@ from numpy import arange, cos, hstack, pi, sin, zeros, array
 from numpy.random import random, seed
 from pymanoid import draw_force, draw_polygon, Contact, PointMass
 from pymanoid.tasks import ContactTask, DOFTask, LinkPoseTask, MinCAMTask
-from threading import Lock
-from time import sleep as real_sleep
-from time import time as real_time
 
 try:
     from hrp4_pymanoid import HRP4 as RobotModel
@@ -54,10 +53,9 @@ except ImportError:
     from pymanoid.robots import JVRC1 as RobotModel
 
 
-dt = 3e-2  # [s]
+clock = threading.Event()
 gui_handles = {}
-last_bkgnd_switch = None
-robot_lock = Lock()
+robot_lock = threading.Lock()
 robot_mass = 39.  # [kg] updated after robot model is loaded
 start_time = None
 
@@ -130,8 +128,8 @@ def prepare_screenshot(scrot_time=38.175):
     set_camera_1()
     if start_time is None:
         start()
-    while real_time() < start_time + scrot_time:
-        real_sleep(1e-2)
+    while time.time() < start_time + scrot_time:
+        time.sleep(1e-2)
     stop()
     empty_gui_list(gui_handles['forces'])
     empty_gui_list(gui_handles['static'])
@@ -186,24 +184,104 @@ def fsm_callback():
     update_robot_ik()
 
 
-def comdd_callback(comdd):
-    """Find supporting contact forces at each COM acceleration update."""
-    global last_bkgnd_switch
-    gravity = pymanoid.get_gravity()
-    wrench = hstack([robot_mass * (comdd - gravity), zeros(3)])
-    support = fsm.cur_stance.find_supporting_forces(
-        wrench, com_buffer.com.p, 39., 10.)
-    if not support:
-        gui_handles['forces'] = []
-        viewer.SetBkgndColor([.8, .4, .4])
-        last_bkgnd_switch = real_time()
-    else:
-        gui_handles['forces'] = [draw_force(c, fc) for (c, fc) in support]
-    if last_bkgnd_switch is not None \
-            and real_time() - last_bkgnd_switch > 0.2:
-        # let's keep epilepsy at bay
-        viewer.SetBkgndColor([.6, .6, .8])
-        last_bkgnd_switch = None
+class PausableThread(Thread):
+
+    def __init__(self):
+        super(PausableThread, self).__init__()
+        self.daemon = True
+        self.lock = None
+
+    def pause(self):
+        self.lock.acquire()
+
+    def resume(self):
+        self.lock.release()
+
+    def stop(self):
+        self.lock = None
+
+    def start(self):
+        self.lock = threading.Lock()
+        super(PausableThread, self).start()
+
+    def run(self):
+        while self.lock:
+            with self.lock:
+                self.step()
+
+
+class Clock(PausableThread):
+
+    def __init__(self, dt, slowdown=1.):
+        """
+        Create a new Clock thread.
+
+        INPUT:
+
+        - ``dt`` -- time interval between two ticks in simulation time
+        - ``slowdown`` -- ratio from simulation time to real time
+
+        .. NOTE::
+
+            Slowdown is mostly used for debug. You can also stop the clock by
+            ``clock.stop()`` and step it by hand with ``clock.step()``.
+        """
+        super(Clock, self).__init__()
+        self.__sleep_dt = slowdown * dt
+        self.dt = 1. / freq
+        self.freq = freq
+        self.event = threading.Event()
+        self.tick = 0
+
+    def wait_for_tick(self):
+        self.event.wait()
+
+    def wait_for_tick_after(self, tick_id):
+        if self.tick == tick_id:
+            self.event.wait()
+
+    def sleep(self, dT):
+        """
+        Delay execution for a duration ``dT`` in simulation time.
+
+        INPUT:
+
+        - ``dT`` -- sleep duration in simulation time
+        """
+        time.sleep(self.slowdown * dT)
+
+    def step(self):
+        self.event.set()
+        self.event.clear()
+        self.tick += 1
+        time.sleep(self.__sleep_dt)
+
+
+class ForcesThread(PausableThread):
+
+    def __init__(self):
+        super(ForcesThread, self).__init__(self)
+        self.last_bkgnd_switch = None
+
+    def step(self):
+        """Find supporting contact forces at each COM acceleration update."""
+        comdd = com_buffer.comdd
+        gravity = pymanoid.get_gravity()
+        wrench = hstack([robot_mass * (comdd - gravity), zeros(3)])
+        support = fsm.cur_stance.find_supporting_forces(
+            wrench, com_buffer.com.p, robot_mass, 10.)
+        if not support:
+            gui_handles['forces'] = []
+            viewer.SetBkgndColor([.8, .4, .4])
+            self.last_bkgnd_switch = time.time()
+        else:
+            gui_handles['forces'] = [draw_force(c, fc) for (c, fc) in support]
+        if self.last_bkgnd_switch is not None \
+                and time.time() - self.last_bkgnd_switch > 0.2:
+            # let's keep epilepsy at bay
+            viewer.SetBkgndColor([.6, .6, .8])
+            self.last_bkgnd_switch = None
+        clock.wait()
 
 
 if __name__ == "__main__":
@@ -275,13 +353,15 @@ if __name__ == "__main__":
             robot.ik.add_task(
                 DOFTask(robot, robot.ROT_P, 0., gain=0.9, weight=0.5))
 
+    clock = Clock(dt=3e-2)
+
     def start():
         global start_time
-        fsm.start_thread(dt, fsm_callback)
-        com_buffer.start_thread(comdd_callback)
-        mpc.start_thread()
-        robot.start_ik_thread(dt)
-        start_time = real_time()
+        fsm.start_thread(clock, fsm_callback)
+        com_buffer.start_thread(clock)
+        mpc.start_thread(clock)
+        robot.start_ik_thread(3e-2)
+        start_time = time.time()
 
     def stop():
         fsm.stop_thread()
