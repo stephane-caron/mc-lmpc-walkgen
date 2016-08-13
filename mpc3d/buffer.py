@@ -30,39 +30,47 @@ class COMAccelBuffer(object):
     execute them until the next update.
     """
 
-    def __init__(self, com, fsm, show_preview=True):
+    def __init__(self, com, fsm, show_past=False, show_preview=True):
         self.com = com
         self.comd = zeros(3)
         self.comdd = zeros(3)
-        self.comdd_index = 0
-        self.comdd_lock = Lock()
+        self.preview_index = 0
+        self.preview_lock = Lock()
         self.comdd_vector = None
         self.fsm = fsm
-        self.past_handles = []
-        self.preview_handles = []
-        self.show_preview = show_preview
+        self.preview = None
+        self.past_handles = [] if show_past else None
+        self.preview_handles = [] if show_preview else None
         self.thread = None
         self.thread_lock = Lock()
-        self.timestep = 0.
 
-    def update_control(self, mpc):
-        with self.comdd_lock:
-            self.comdd_index = 0
-            self.comdd_vector = mpc.U
-            self.timestep = mpc.timestep
+    def update_preview(self, preview):
+        with self.preview_lock:
+            self.preview_index = 0
+            self.preview = preview
+            if self.preview_handles is not None:
+                self.draw_preview()
 
-    def get_next_acceleration(self):
-        with self.comdd_lock:
-            if self.comdd_vector is None:
+    def get_next_preview_window(self):
+        """
+        Returns the next pair ``(comdd, dT)`` in the preview window, where
+        acceleration ``comdd`` is executed during ``dT``.
+        """
+        with self.preview_lock:
+            if self.preview is None:
+                return (zeros(3), 0.)
+            j = 3 * self.preview_index
+            comdd = self.preview.U[j:j + 3]
+            if comdd.shape[0] == 0:
                 comdd = zeros(3)
-            else:
-                j = 3 * self.comdd_index
-                comdd = self.comdd_vector[j:j + 3]
-                if comdd.shape[0] == 0:
-                    comdd = zeros(3)
-                    self.comdd_vector = None
-            self.comdd_index += 1
-            return (comdd, self.timestep)
+                self.preview = None
+            self.preview_index += 1
+            return (comdd, self.preview.timestep)
+
+    @property
+    def preview_was_updated(self):
+        """Returns True when preview was updated since last read."""
+        return self.preview_index == 0
 
     def start_thread(self, sim):
         self.thread = Thread(target=self.run_thread, args=(sim,))
@@ -82,20 +90,33 @@ class COMAccelBuffer(object):
         comdd = zeros(3)
         while self.thread_lock:
             with self.thread_lock:
-                (comdd, rem_time) = self.get_next_acceleration()
-                while rem_time > 0.:
-                    sim.sync_loop('com_buffer')
-                    if self.comdd_index == 0:  # there was a control update
-                        break
-                    dt = rem_time if rem_time < sim.dt else sim.dt
-                    self.euler_integrate(comdd, dt)
-                    sim.sleep(dt)
-                    rem_time -= dt
+                sim.sync_loop('com_buffer')
+                (comdd, dT) = self.get_next_preview_window()
+                self.euler_integrate(comdd, dT)
+                sim.sleep(dT)
 
     def euler_integrate(self, comdd, dt):
         com0 = self.com.p
         self.com.set_pos(com0 + self.comd * dt + comdd * .5 * dt ** 2)
         self.comd += comdd * dt
         self.comdd = comdd
-        self.past_handles.append(
-            draw_line(com0, self.com.p, color='b', linewidth=3))
+        if self.past_handles is not None:
+            self.past_handles.append(
+                draw_line(com0, self.com.p, color='b', linewidth=3))
+
+    def clear_preview(self):
+        self.preview_handles = []
+
+    def draw_preview(self):
+        com = self.com.p
+        comd = self.comd
+        dT = self.preview.timestep
+        for preview_index in xrange(len(self.preview.U) / 3):
+            com0 = com
+            j = 3 * preview_index
+            comdd = self.preview.U[j:j + 3]
+            com = com + comd * dT + comdd * .5 * dT ** 2
+            comd += comdd * dT
+            color = 'b' if preview_index <= self.preview.switch_step else 'r'
+            self.preview_handles.append(
+                draw_line(com0, com, color=color, linewidth=3))
