@@ -77,13 +77,13 @@ def generate_staircase(radius, angular_step, height, roughness, friction,
 
     INPUT:
 
-    radius -- staircase radius (in [m])
-    angular_step -- angular step between contacts (in [rad])
-    height -- altitude variation (in [m])
-    roughness -- amplitude of roll-pitch-yaw orientations at contacts (in [rad])
-    friction -- friction coefficient between a robot foot and a step
-    step_dim_x -- half-length of each step
-    step_dim_y -- half-width of each step
+    - ``radius`` -- staircase radius (in [m])
+    - ``angular_step`` -- angular step between contacts (in [rad])
+    - ``height`` -- altitude variation (in [m])
+    - ``roughness`` -- amplitude of contact roll, pitch and yaw (in [rad])
+    - ``friction`` -- friction coefficient between a robot foot and a step
+    - ``step_dim_x`` -- half-length of each step
+    - ``step_dim_y`` -- half-width of each step
     """
     steps = []
     for theta in arange(0., 2 * pi, angular_step):
@@ -110,11 +110,6 @@ def generate_staircase(radius, angular_step, height, roughness, friction,
         steps.append(left_foot)
         steps.append(right_foot)
     return steps
-
-
-def empty_gui_list(l):
-    for i in xrange(len(l)):
-        l[i] = None
 
 
 def dash_graph_handles(handles):
@@ -148,20 +143,16 @@ def prepare_screenshot(scrot_time=38.175):
     stop()
     empty_gui_list(gui_handles['forces'])
     empty_gui_list(gui_handles['static'])
-    # empty_gui_list(mpc.cone_handle)
     mpc.target_box.hide()
-    # mpc.tube_handle.SetShow(False)
     com_buffer.com.set_visible(False)
-    # com_buffer.comdd_handle.Close()
     robot.set_transparency(0)
     viewer.SetBkgndColor([1, 1, 1])
     dash_graph_handles(fsm.left_foot_traj_handles)
     dash_graph_handles(fsm.right_foot_traj_handles)
-    # dash_graph_handles(com_buffer.com_traj_handles)
 
 
-def fsm_post_step_callback():
-    # (1) Update static-equilibrium polygon
+def update_sep():
+    """UPdate static-equilibrium polygons"""
     if fsm.cur_stance.is_single_support:
         ss_stance = fsm.cur_stance
         ds_stance = fsm.next_stance
@@ -175,7 +166,9 @@ def fsm_post_step_callback():
     gui_handles['static-ds'] = draw_polygon(
         [(x[0], x[1], sep_height) for x in ds_stance.sep],
         normal=[0, 0, 1], color='y')
-    # (2) Update IK tasks
+
+
+def update_robot_ik():
     with robot_lock:
         robot.ik.remove_task(robot.left_foot.name)
         robot.ik.remove_task(robot.right_foot.name)
@@ -193,6 +186,11 @@ def fsm_post_step_callback():
             fsm.free_foot.reset(robot.right_foot.pose, fsm.next_contact.pose)
             robot.ik.add_task(
                 LinkPoseTask(robot, robot.right_foot, fsm.free_foot))
+
+
+def fsm_post_step_callback():
+    update_sep()
+    update_robot_ik()
 
 
 last_bkgnd_switch = None
