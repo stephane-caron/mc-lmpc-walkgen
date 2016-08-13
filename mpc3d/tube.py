@@ -22,7 +22,7 @@ import pymanoid
 
 from numpy import array, cross, dot, float64, hstack, ones, sqrt, vstack, zeros
 from polygons import compute_polygon_hull, intersect_line_cylinder
-from pymanoid.draw import draw_3d_cone, draw_line, draw_polyhedron
+from pymanoid.draw import draw_3d_cone, draw_line, draw_point, draw_polyhedron
 from pymanoid.polyhedra import Polytope
 from scipy.spatial.qhull import QhullError
 
@@ -197,18 +197,21 @@ class COMTube(object):
         GUI handles.
         """
         handles = []
-        colors = ['y', 'c']
+        colors = [(0.5, 0.5, 0., 0.3), (0., 0.5, 0.5, 0.3)]
         if self.start_stance.is_single_support:
             colors.reverse()
         for (stance_id, vlist) in self._vertices.iteritems():
             if stance_id > 0 and self._single_polytope:
                 break
+            elif len(vlist) == 1:
+                handles.append(draw_point(
+                    vlist[0], color=[0., 0.5, 0.5], pointsize=0.025))
             elif len(vlist) == 2:
                 handles.append(draw_line(
                     vlist[0], vlist[1], color=[0., 0.5, 0.5], linewidth=5))
             else:  # should be a full polytope
                 color = colors[stance_id]
-                handles.extend(draw_polyhedron(vlist, '%c.-' % color))
+                handles.extend(draw_polyhedron(vlist, '*.-#', color=color))
         return handles
 
     """
@@ -275,5 +278,5 @@ class COMTube(object):
             handles.extend(draw_3d_cone(
                 # recall that cone_vertices[0] is [0, 0, +g]
                 apex=apex, axis=[0, 0, 1], section=vscale[1:],
-                combined='r-'))
+                combined='r-#'))
         return handles

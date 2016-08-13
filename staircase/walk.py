@@ -127,7 +127,7 @@ def prepare_screenshot(scrot_time=38.175):
         sim.start()
     while sim.time() < scrot_time:
         sim.sleep(1e-2)
-    stop()
+    sim.stop()
     # empty_gui_list(gui_handles['forces'])
     # empty_gui_list(gui_handles['static'])
     mpc.target_box.hide()
@@ -146,7 +146,7 @@ def update_sep():
     else:  # fsm.cur_stance.is_double_support:
         ss_stance = fsm.next_stance
         ds_stance = fsm.cur_stance
-    sep_height = com_buffer.cur_height - 0.5
+    sep_height = com_buffer.cur_height - RobotModel.leg_length
     gui_handles['static-ss'] = draw_polygon(
         [(x[0], x[1], sep_height) for x in ss_stance.sep],
         normal=[0, 0, 1], color='c')
@@ -309,11 +309,7 @@ if __name__ == "__main__":
     mpc.start_thread(sim)
     robot.start_ik_thread(3e-2)
 
-    def stop():
-        fsm.stop_thread()
-        com_buffer.stop_thread()
-        mpc.stop_thread()
-        robot.stop_ik_thread()
+    fsm_callback()  # show SE polygons at startup
 
     set_camera_1()
     print """
