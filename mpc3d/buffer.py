@@ -69,7 +69,7 @@ class COMAccelBuffer(object):
             return (comdd, self.timestep)
 
     def start_thread(self, sim):
-        self.thread = Thread(target=self.run_thread, args=(sim))
+        self.thread = Thread(target=self.run_thread, args=(sim,))
         self.thread.daemon = True
         self.thread.start()
 
@@ -86,15 +86,14 @@ class COMAccelBuffer(object):
         comdd = zeros(3)
         while self.thread_lock:
             with self.thread_lock:
-                sim.sync('com_buffer_outer')
                 (comdd, rem_time) = self.get_next_acceleration()
                 while rem_time > 0.:
-                    sim.sync('com_buffer_inner')
+                    sim.sync_loop('com_buffer')
                     if self.comdd_index == 0:  # there was a control update
                         break
                     dt = rem_time if rem_time < sim.dt else sim.dt
                     self.euler_integrate(comdd, dt)
-                    sim.sleep()
+                    sim.sleep(dt)
                     rem_time -= dt
 
     def euler_integrate(self, comdd, dt):

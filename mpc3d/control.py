@@ -251,8 +251,7 @@ class FeedbackPreviewController(object):
 
     def start_thread(self, sim):
         self.thread_lock = Lock()
-        self.thread = Thread(
-            target=self.run_thread, args=(sim))
+        self.thread = Thread(target=self.run_thread, args=(sim,))
         self.thread.daemon = True
         self.thread.start()
 
@@ -269,7 +268,7 @@ class FeedbackPreviewController(object):
         target_comd = zeros(3)
         fail = False
         while self.thread_lock:
-            sim.sync('control')
+            sim.sync_loop('control')
             cur_com = self.com_buffer.com.p
             cur_comd = self.com_buffer.comd
             cur_stance = self.fsm.cur_stance

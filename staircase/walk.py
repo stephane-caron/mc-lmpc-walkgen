@@ -32,15 +32,14 @@ except ImportError:
     import pymanoid
 
 try:
-    from mpc3d.buffer import COMAccelBuffer
-    from mpc3d.control import FeedbackPreviewController
-    from mpc3d.fsm import StanceFSM
+    from mpc3d.buffer import COMAccelBuffer  # whatever
 except ImportError:
     script_path = os.path.realpath(__file__)
     sys.path.append(os.path.dirname(script_path) + '/..')
-    from mpc3d.com_buffer import COMAccelBuffer
+    from mpc3d.buffer import COMAccelBuffer
     from mpc3d.control import FeedbackPreviewController
     from mpc3d.fsm import StanceFSM
+    from mpc3d.simulation import Simulation
 
 from numpy import arange, cos, hstack, pi, sin, zeros, array
 from numpy.random import random, seed
@@ -56,7 +55,6 @@ except ImportError:
 gui_handles = {}
 robot_lock = threading.Lock()
 robot_mass = 39.  # [kg] updated after robot model is loaded
-start_time = None
 
 
 def generate_staircase(radius, angular_step, height, roughness, friction,
@@ -125,13 +123,13 @@ def set_camera_1():
 
 def prepare_screenshot(scrot_time=38.175):
     set_camera_1()
-    if start_time is None:
-        start()
-    while time.time() < start_time + scrot_time:
-        time.sleep(1e-2)
+    if not sim.is_started:
+        sim.start()
+    while sim.time() < scrot_time:
+        sim.sleep(1e-2)
     stop()
-    empty_gui_list(gui_handles['forces'])
-    empty_gui_list(gui_handles['static'])
+    # empty_gui_list(gui_handles['forces'])
+    # empty_gui_list(gui_handles['static'])
     mpc.target_box.hide()
     com_buffer.com.set_visible(False)
     robot.set_transparency(0)
@@ -183,7 +181,7 @@ def fsm_callback():
     update_robot_ik()
 
 
-class PausableThread(Thread):
+class PausableThread(threading.Thread):
 
     def __init__(self):
         super(PausableThread, self).__init__()
@@ -207,70 +205,6 @@ class PausableThread(Thread):
         while self.lock:
             with self.lock:
                 self.step()
-
-
-class Simulation(object):
-
-    def __init__(self, dt, slowdown=None):
-        """
-        Create a new simulation object.
-
-        INPUT:
-
-        - ``dt`` -- time interval between two ticks in simulation time
-        - ``slowdown`` -- ratio from simulation time to real time
-        """
-        self.__sleep_dt = slowdown * dt if slowdown else dt
-        self.dt = dt
-        self.event = threading.Event()
-        self.start_time = time.time()
-        self.loop_start = {}
-
-    def pause(self):
-        self.event.clear()
-
-    def resume(self):
-        self.event.set()
-
-    def sleep(self, dT=None):
-        """
-        Delay execution for a duration ``dT`` in simulation time.
-
-        INPUT:
-
-        - ``dT`` -- sleep duration in simulation time
-        """
-        if dT is None:
-            return time.sleep(self.__sleep_dt)
-        elif self.slowdown:
-            return time.sleep(self.slowdown * dT)
-        return time.sleep(dT)
-
-    def step(self):
-        self.event.set()
-        self.event.clear()
-
-    def sync(self, name):
-        """
-        Check that the loop of the process identified by ``name`` does not
-        execute faster than ``self.dt``.
-
-        INPUT:
-
-        - ``name`` -- identifier of caller thread
-        """
-        self.event.wait()
-        cur_time = self.time()
-        if name in self.loop_start:
-            sim_elapsed = cur_time - self.loop_start[name]
-            if sim_elapsed < self.dt:
-                self.sleep(self.dt - sim__elapsed)
-        self.loop_start[name] = cur_time
-
-    def time(self):
-        if self.slowdown:
-            return self.slowdown * (time.time() - self.start_time)
-        return time.time() - self.start_time
 
 
 class ForcesThread(PausableThread):
@@ -370,14 +304,10 @@ if __name__ == "__main__":
                 DOFTask(robot, robot.ROT_P, 0., gain=0.9, weight=0.5))
 
     sim = Simulation(dt=3e-2)
-
-    def start():
-        global start_time
-        fsm.start_thread(sim, fsm_callback)
-        com_buffer.start_thread(sim)
-        mpc.start_thread(sim)
-        robot.start_ik_thread(3e-2)
-        start_time = time.time()
+    fsm.start_thread(sim, fsm_callback)
+    com_buffer.start_thread(sim)
+    mpc.start_thread(sim)
+    robot.start_ik_thread(3e-2)
 
     def stop():
         fsm.stop_thread()
@@ -391,11 +321,10 @@ if __name__ == "__main__":
 Multi-contact WPG based on Model Preview Control of 3D COM Accelerations
 ========================================================================
 
-Ready to go! Type one of the following commands:
+Ready to go! You can control the simulation by:
 
-    start() -- start walking
-    stop() -- freeze (cannot restart afterwards)
-    prepare_screenshot() -- used to generate Figure 1 of the paper
+    sim.start()     sim.pause()
+    sim.stop()      sim.resume()
 
 You can access all state variables via this IPython shell.
 Here is the list of global objects. Use <TAB> to see what's inside.

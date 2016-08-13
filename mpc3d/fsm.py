@@ -129,7 +129,7 @@ class StanceFSM(object):
         """
         self.thread_lock = Lock()
         self.thread = Thread(
-            target=self.run_thread, args=(sim, callback,))
+            target=self.run_thread, args=(sim, callback))
         self.thread.daemon = True
         self.thread.start()
 
@@ -154,11 +154,13 @@ class StanceFSM(object):
         record_foot_traj = True
         while self.thread_lock:
             with self.thread_lock:
+                sim.sync_loop('fsm_outer')
                 phase_duration = \
                     self.ds_duration if self.cur_stance.is_double_support \
                     else self.ss_duration
                 self.rem_time = phase_duration
                 for t in arange(0., phase_duration, sim.dt):
+                    sim.sync_loop('fsm_inner')
                     self.state_time = t
                     if self.cur_stance.is_single_support:
                         progress = self.state_time / phase_duration  # in [0, 1]
@@ -173,7 +175,6 @@ class StanceFSM(object):
                                 self.left_foot_traj_handles.append(
                                     draw_line(prev_pos, self.free_foot.p,
                                               color='g', linewidth=3))
-                    sim.sleep()
                     self.rem_time -= sim.dt
                 if self.cur_stance.is_double_support:
                     next_stance = self.next_stance
@@ -182,10 +183,9 @@ class StanceFSM(object):
                         return next_stance.is_inside_static_equ_polygon(p, 39.)
 
                     while not is_inside_next_com_polygon(self.com.p):
-                        sim.sleep()
+                        sim.sync_loop('fsm_inner')
                 self.step()
                 callback()
-                sim.sync()
 
     @property
     def next_contact(self):
