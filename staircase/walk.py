@@ -56,18 +56,10 @@ except ImportError:
 
 dt = 3e-2  # [s]
 gui_handles = {}
+last_bkgnd_switch = None
 robot_lock = Lock()
 robot_mass = 39.  # [kg] updated after robot model is loaded
-sim_timescale = 1.
 start_time = None
-
-
-def sim_sleep(duration):
-    real_sleep(sim_timescale * duration)
-
-
-def sim_time():
-    return sim_timescale * real_time()
 
 
 def generate_staircase(radius, angular_step, height, roughness, friction,
@@ -188,15 +180,14 @@ def update_robot_ik():
                 LinkPoseTask(robot, robot.right_foot, fsm.free_foot))
 
 
-def fsm_post_step_callback():
+def fsm_callback():
+    """Function called after each FSM phase transition."""
     update_sep()
     update_robot_ik()
 
 
-last_bkgnd_switch = None
-
-
 def comdd_callback(comdd):
+    """Find supporting contact forces at each COM acceleration update."""
     global last_bkgnd_switch
     gravity = pymanoid.get_gravity()
     wrench = hstack([robot_mass * (comdd - gravity), zeros(3)])
@@ -284,18 +275,12 @@ if __name__ == "__main__":
             robot.ik.add_task(
                 DOFTask(robot, robot.ROT_P, 0., gain=0.9, weight=0.5))
 
-    # with robot_lock:
-    #    active_dofs += robot.left_arm + robot.right_arm
-    #    robot.set_active_dofs(active_dofs)
-    #    robot.ik.tasks['com'].exclude_dofs(robot.left_arm + robot.right_arm)
-    #    robot.ik.tasks['mincam'].exclude_dofs(robot.left_leg + robot.right_leg)
-
     def start():
         global start_time
-        fsm.start_thread(dt, fsm_post_step_callback, sim_sleep)
-        com_buffer.start_thread(comdd_callback, sim_sleep)
+        fsm.start_thread(dt, fsm_callback)
+        com_buffer.start_thread(comdd_callback)
         mpc.start_thread()
-        robot.start_ik_thread(dt, sim_sleep)
+        robot.start_ik_thread(dt)
         start_time = real_time()
 
     def stop():

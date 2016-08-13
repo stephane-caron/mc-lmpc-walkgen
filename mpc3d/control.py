@@ -18,6 +18,8 @@
 # You should have received a copy of the GNU General Public License along with
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
+import time
+
 from tube import COMTube, TubeError
 from numpy import array, bmat, dot, eye, hstack, sqrt, vstack, zeros
 from pymanoid import PointMass, solve_qp, draw_arrow
@@ -25,8 +27,6 @@ from pymanoid import PointMass, solve_qp, draw_arrow
 from scipy.linalg import block_diag
 from threading import Lock, Thread
 from warnings import warn
-
-import time
 
 
 def norm(v):

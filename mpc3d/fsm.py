@@ -19,6 +19,7 @@
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
 import pymanoid
+import time
 
 from numpy import arange, hstack
 from pymanoid import draw_line
@@ -26,7 +27,6 @@ from pymanoid.rotations import quat_slerp
 from pymanoid.rotations import rotation_matrix_from_quat
 from stance import Stance
 from threading import Lock, Thread
-from time import sleep as real_sleep
 
 
 def pose_interp(pose0, pose1, t):
@@ -119,12 +119,10 @@ class StanceFSM(object):
         self.thread = None
         self.thread_lock = None
 
-    def start_thread(self, dt, post_step_callback, sleep_fun=None):
-        if sleep_fun is None:
-            sleep_fun = real_sleep
+    def start_thread(self, dt, callback):
         self.thread_lock = Lock()
         self.thread = Thread(
-            target=self.run_thread, args=(dt, post_step_callback, sleep_fun))
+            target=self.run_thread, args=(dt, callback,))
         self.thread.daemon = True
         self.thread.start()
 
@@ -137,11 +135,18 @@ class StanceFSM(object):
     def stop_thread(self):
         self.thread_lock = None
 
-    def run_thread(self, dt, post_step_callback, sleep_fun):
+    def run_thread(self, dt, callback):
+        """
+        Run the FSM thread.
+
+        INPUT:
+
+        - ``dt`` -- time step used to update the free limb pose
+        - ``callback`` -- function called after each phase transition
+        """
         record_foot_traj = True
         while self.thread_lock:
             with self.thread_lock:
-                post_step_callback()
                 phase_duration = \
                     self.ds_duration if self.cur_stance.is_double_support \
                     else self.ss_duration
@@ -161,7 +166,7 @@ class StanceFSM(object):
                                 self.left_foot_traj_handles.append(
                                     draw_line(prev_pos, self.free_foot.p,
                                               color='g', linewidth=3))
-                    sleep_fun(dt)
+                    time.sleep(dt)
                     self.rem_time -= dt
                 if self.cur_stance.is_double_support:
                     next_stance = self.next_stance
@@ -170,9 +175,9 @@ class StanceFSM(object):
                         return next_stance.is_inside_static_equ_polygon(p, 39.)
 
                     while not is_inside_next_com_polygon(self.com.p):
-                        sleep_fun(dt)
-                if self.thread_lock is not None:  # DEBUG -- TODO: remove
-                    self.step()
+                        time.sleep(dt)
+                self.step()
+                callback()
 
     @property
     def next_contact(self):

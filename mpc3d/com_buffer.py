@@ -19,11 +19,11 @@
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
 import pylab
+import time
 
 from numpy import zeros
 from pymanoid import draw_line
 from threading import Lock, Thread
-from time import sleep as rt_sleep
 
 
 class COMAccelBuffer(object):
@@ -40,26 +40,26 @@ class COMAccelBuffer(object):
         self.comd = zeros(3)
         self.comdd = zeros(3)
         self.comdd_index = 0
+        self.comdd_lock = Lock()
         self.comdd_traj = []
         self.comdd_vector = None
         self.fsm = fsm
         self.thread = None
         self.thread_lock = Lock()
         self.timestep = 0.
-        self.update_lock = Lock()
 
     @property
     def cur_height(self):
         return self.com.z
 
     def update_control(self, mpc):
-        with self.update_lock:
+        with self.comdd_lock:
             self.comdd_index = 0
             self.comdd_vector = mpc.U
             self.timestep = mpc.timestep
 
     def get_next_acceleration(self):
-        with self.update_lock:
+        with self.comdd_lock:
             if self.comdd_vector is None:
                 comdd = zeros(3)
             else:
@@ -71,11 +71,9 @@ class COMAccelBuffer(object):
             self.comdd_index += 1
             return (comdd, self.timestep)
 
-    def start_thread(self, comdd_callback, sleep_fun=None):
-        if sleep_fun is None:
-            sleep_fun = rt_sleep
+    def start_thread(self, callback):
         self.thread = Thread(
-            target=self.run_thread, args=(comdd_callback, sleep_fun,))
+            target=self.run_thread, args=(callback,))
         self.thread.daemon = True
         self.thread.start()
 
@@ -88,12 +86,12 @@ class COMAccelBuffer(object):
     def stop_thread(self):
         self.thread_lock = None
 
-    def run_thread(self, comdd_callback, sleep_fun):
+    def run_thread(self, callback):
         comdd = zeros(3)
         while self.thread_lock:
             with self.thread_lock:
+                t0 = time.time()
                 (comdd, dT) = self.get_next_acceleration()
-                comdd_callback(comdd)
                 prev_com = self.com.p
                 self.com.set_pos(
                     prev_com + self.comd * dT + comdd * .5 * dT ** 2)
@@ -103,7 +101,8 @@ class COMAccelBuffer(object):
                     draw_line(prev_com, self.com.p, color='b', linewidth=3))
                 self.comdd = comdd
                 self.comdd_traj.append(comdd)
-                sleep_fun(dT)
+                callback(comdd)
+                time.sleep(dT - time.time() + t0)
 
     def plot_com_traj(self):
         pylab.ion()
