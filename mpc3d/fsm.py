@@ -184,6 +184,7 @@ class StanceFSM(object):
 
                     while not is_inside_next_com_polygon(self.com.p):
                         sim.sync_loop('fsm_inner')
+                        print "COM is not ready for next SS yet"
                 self.step()
                 callback()
 

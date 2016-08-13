@@ -18,12 +18,9 @@
 # You should have received a copy of the GNU General Public License along with
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
-import time
-
 from tube import COMTube, TubeError
 from numpy import array, bmat, dot, eye, hstack, sqrt, vstack, zeros
 from pymanoid import PointMass, solve_qp, draw_arrow
-# from pymanoid.quadratic_programming import cvxopt_solve_qp
 from scipy.linalg import block_diag
 from threading import Lock, Thread
 from warnings import warn
@@ -159,9 +156,14 @@ class PreviewControl(object):
         # G = self.G_state
         # h = self.h_state
 
-        t0 = time.time()
         self.U = solve_qp(P, q, G, h)
-        print time.time() - t0
+        import pylab
+        print "End error:", (
+            dot(self.U, dot(P2, self.U)) + 2 * dot(q2, self.U) +
+            dot(b.T, b))
+        print "End error:", pylab.norm(
+            dot(self.phi_last, self.x_init) + dot(self.psi_last, self.U) -
+            self.x_goal) ** 2
 
 
 class COMAccelPreviewControl(PreviewControl):
@@ -183,6 +185,7 @@ class COMAccelPreviewControl(PreviewControl):
         super(COMAccelPreviewControl, self).__init__(
             A, B, C, d, E, f, x_init, x_goal, nb_steps)
         self.duration = duration
+        self.switch_step = switch_step
         self.timestep = dT
 
     def compute_inequalities(self, tube, switch_step, nb_steps):
@@ -307,7 +310,7 @@ class FeedbackPreviewController(object):
             preview_control.compute_dynamics()
             try:
                 preview_control.compute_control()
-                self.com_buffer.update_control(preview_control)
+                self.com_buffer.update_preview(preview_control)
             except ValueError as e:
                 warn("MPC: couldn't solve QP, maybe inconsistent constraints?")
                 print "Exception:", e
