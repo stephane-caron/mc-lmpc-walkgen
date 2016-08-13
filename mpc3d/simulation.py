@@ -67,9 +67,14 @@ class Simulation(object):
     def start(self):
         self.event.set()
 
-    def step(self):
+    def step(self, nb_steps=1):
         self.event.set()
         self.event.clear()
+        while nb_steps > 1:
+            nb_steps -= 1
+            self.sleep(self.dt)
+            self.event.set()
+            self.event.clear()
 
     def stop(self):
         self.event.clear()
