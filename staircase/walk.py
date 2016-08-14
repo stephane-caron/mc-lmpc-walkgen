@@ -52,6 +52,13 @@ except ImportError:
     from pymanoid.robots import JVRC1 as RobotModel
 
 
+# Settings
+dt = 3e-2              # [s] simulation time step
+ds_duration = 20 * dt  # [s] duration of double-support phases
+ss_duration = 30 * dt  # [s] duration of single-support phases
+
+
+# Global variables
 gui_handles = {}
 robot_lock = threading.Lock()
 robot_mass = 39.  # [kg] updated after robot model is loaded
@@ -255,8 +262,8 @@ if __name__ == "__main__":
     com_pm = PointMass([0, 0, 0], robot_mass)
     fsm = StateMachine(
         staircase, com_pm, 'DS-R',
-        ss_duration=1.0,
-        ds_duration=0.5,
+        ss_duration=ss_duration,
+        ds_duration=ds_duration,
         init_com_offset=array([0.05, 0., 0.]),
         cyclic=True,
         callback=fsm_callback)
@@ -311,11 +318,11 @@ if __name__ == "__main__":
             robot.ik.add_task(
                 DOFTask(robot, robot.ROT_P, 0., gain=0.9, weight=0.5))
 
-    sim = Simulation(dt=3e-2)
+    sim = Simulation(dt)
     sim.add_callback(fsm.on_tick)
     sim.add_callback(preview_buffer.on_tick)
     sim.add_callback(mpc.on_tick)
-    robot.start_ik_thread(3e-2)
+    robot.start_ik_thread(dt)
 
     fsm_callback()  # show SE polygons at startup
 
