@@ -154,7 +154,7 @@ class PreviewControl(object):
         # Cost 3: |pd_N - pd_goal|^3 = |A[3:] x - b[3:]|^3
         P3 = dot(A[3:].T, A[3:])
         q3 = -dot(b[3:].T, A[3:])
-        w3 = 100.
+        w3 = 1000.
 
         # Weighted combination of all costs
         P = w1 * P1 + w2 * P2 + w3 * P3
@@ -279,8 +279,7 @@ class COMPreviewLoop(object):
         cur_stance = self.fsm.cur_stance
         next_stance = self.fsm.next_stance
         preview_targets = self.fsm.get_preview_targets()
-        switch_time, horizon, target_com = preview_targets
-        target_comd = zeros(3)
+        switch_time, horizon, target_com, target_comd = preview_targets
 
         target_moved = norm(target_com - self.target_box.p) > 1e-3
         phase_switched = self.fsm.phase_id > self.last_phase_id

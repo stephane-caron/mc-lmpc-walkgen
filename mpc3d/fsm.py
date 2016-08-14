@@ -178,11 +178,15 @@ class StateMachine(object):
             horizon = self.rem_time \
                 + self.ds_duration \
                 + 0.5 * self.ss_duration
-            com_target = self.next_stance.com
+            target_com = self.next_stance.com
+            delta_com = self.next_stance.com - self.cur_stance.com
+            target_comd = delta_com / (2 * self.ds_duration)
         elif self.cur_stance.is_double_support:
             horizon = self.rem_time + 0.5 * self.ss_duration
-            com_target = self.cur_stance.com
+            target_com = self.cur_stance.com
+            target_comd = self.next_stance.comd
         else:  # single support with plenty of time ahead
             horizon = self.rem_time
-            com_target = self.cur_stance.com
-        return (self.rem_time, horizon, com_target)
+            target_com = self.cur_stance.com
+            target_comd = self.cur_stance.comd
+        return (self.rem_time, horizon, target_com, target_comd)

@@ -54,6 +54,15 @@ class Stance(pymanoid.ContactSet):
         return self.state.startswith('SS')
 
     @property
+    def comd(self):
+        if self.is_double_support:
+            return None
+        elif self.left_foot is not None:
+            return 0.1 * self.left_foot.t
+        else:  # self.right_foot is not None
+            return 0.1 * self.right_foot.t
+
+    @property
     def cwc(self):
         """Contact Wrench Cone at world origin"""
         if self._cwc is None:
