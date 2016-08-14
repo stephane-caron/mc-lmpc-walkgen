@@ -77,12 +77,13 @@ class PreviewBuffer(object):
                 draw_line(com0, self.com.p, color='b', linewidth=3))
         self.rem_time -= sim.dt
 
-    def clear_preview(self):
-        self.preview_handles = []
-
     def draw_preview(self):
         com, comd = self.com.p, self.com.pd
+        com_free, comd_free = self.com.p, self.com.pd
         dT = self.preview.timestep
+        self.preview_handles = []
+        self.preview_handles.append(
+            draw_point(self.com.p, color='m', pointsize=0.007))
         for preview_index in xrange(len(self.preview.U) / 3):
             com0 = com
             j = 3 * preview_index
@@ -94,3 +95,9 @@ class PreviewBuffer(object):
                 draw_point(com, color=color, pointsize=0.005))
             self.preview_handles.append(
                 draw_line(com0, com, color=color, linewidth=3))
+            com_free0 = com_free
+            com_free = com_free + comd_free * dT
+            self.preview_handles.append(
+                draw_point(com_free, color='g', pointsize=0.005))
+            self.preview_handles.append(
+                draw_line(com_free0, com_free, color='g', linewidth=3))
