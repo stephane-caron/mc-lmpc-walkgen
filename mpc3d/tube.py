@@ -94,7 +94,6 @@ class COMTube(object):
         self.radius = radius
         self.safety_margin = safety_margin
         self.shape = shape
-        self.single_polytope = False
         self.start_com = start_com
         self.start_stance = start_stance
         self.target_com = target_com
@@ -111,8 +110,7 @@ class COMTube(object):
     def compute_primal_vrep(self):
         delta = self.target_com - self.start_com
         if dot(delta, delta) < 1e-6:
-            self._single_polytope = True
-            self._vertices = {0: [self.start_com], 1: [self.start_com]}
+            self._vertices = {0: [self.start_com]}
             return
         n = normalize(delta)
         t = array([0., 0., 1.])
@@ -145,8 +143,12 @@ class COMTube(object):
                 vertices = (
                     [tube_start + s for s in cross_section] +
                     [tube_end + s for s in cross_section])
-                self._single_polytope = True
-                self._vertices = {0: vertices, 1: vertices}
+                if self.start_stance.is_single_support:
+                    # we are at the end of an SS phase
+                    self._vertices = {0: vertices}
+                else:  # self.start_stance.is_double_support
+                    # we are in DS but polytope is included in the next SS-SEP
+                    self._vertices = {0: vertices, 1: vertices}
                 return
             if self.start_stance.is_single_support:
                 mid_vertex = start_vertex + 0.95 * (mid_vertex - start_vertex)
@@ -160,7 +162,6 @@ class COMTube(object):
                 vertices0.append(end_vertex)
                 vertices1.append(mid_vertex)
                 vertices1.append(end_vertex)
-        self._single_polytope = False
         self._vertices = {0: vertices0, 1: vertices1}
 
     def compute_polytope_center(self, stance_id):

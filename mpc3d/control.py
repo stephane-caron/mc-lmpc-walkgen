@@ -161,10 +161,10 @@ class PreviewControl(object):
         # Inequality constraints
         G_control = block_diag(*[self.C(k) for k in xrange(self.nb_steps)])
         h_control = hstack([self.d(k) for k in xrange(self.nb_steps)])
-        # G = vstack([G_control, self.G_state])
-        # h = hstack([h_control, self.h_state])
-        G = G_control
-        h = h_control
+        G = vstack([G_control, self.G_state])
+        h = hstack([h_control, self.h_state])
+        # G = G_control
+        # h = h_control
         # G = self.G_state
         # h = self.h_state
 
