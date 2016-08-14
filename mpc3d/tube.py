@@ -202,9 +202,7 @@ class COMTube(object):
         if self.start_stance.is_single_support:
             colors.reverse()
         for (stance_id, vlist) in self._vertices.iteritems():
-            if stance_id > 0 and self._single_polytope:
-                break
-            elif len(vlist) == 1:
+            if len(vlist) == 1:
                 handles.append(draw_point(
                     vlist[0], color=[0., 0.5, 0.5], pointsize=0.025))
             elif len(vlist) == 2:
@@ -272,7 +270,7 @@ class COMTube(object):
 
     def draw_dual_cones(self, scale=0.1):
         handles = []
-        for stance_id in [0, 1]:
+        for stance_id in self._vertices.keys():
             apex = self.compute_polytope_center(stance_id)
             cone_vertices = self.compute_dual_vrep(stance_id)
             vscale = [apex + scale * array(v) for v in cone_vertices]

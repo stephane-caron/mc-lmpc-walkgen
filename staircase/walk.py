@@ -53,9 +53,10 @@ except ImportError:
 
 
 # Settings
-dt = 3e-2              # [s] simulation time step
-ds_duration = 20 * dt  # [s] duration of double-support phases
-ss_duration = 30 * dt  # [s] duration of single-support phases
+dt = 3e-2           # [s] simulation time step
+ds_duration = 1.0   # [s] duration of double-support phases
+ss_duration = 0.5   # [s] duration of single-support phases
+tube_radius = 0.03  # [m]
 
 
 # Global variables
@@ -276,7 +277,7 @@ if __name__ == "__main__":
         preview_buffer,
         nb_mpc_steps=10,
         tube_shape=8,
-        tube_radius=0.02)
+        tube_radius=tube_radius)
 
     with robot_lock:
         robot.set_dof_values(robot.q_halfsit)
