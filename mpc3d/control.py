@@ -36,15 +36,21 @@ class PreviewControl(object):
 
         x_{k+1} = A * x_k + B * u_k
 
+    where x is assumed to be the state of a configuration variable p, i.e.,
+
+        x_k = [  p_k ]
+              [ pd_k ]
+
     subject to constraints:
 
-        x_0 = x_init
-        for all k,   C(k) * u_k <= d(k)
-        for all k,   E(k) * x_k <= f(k)
+        x_0 = x_init                    -- initial state
+        for all k,   C(k) * u_k <= d(k) -- control constraints
+        for all k,   E(k) * p_k <= f(k) -- position constraints
 
     The output control law will minimize, by decreasing priority:
 
-        1)  |x_{nb_steps} - x_goal|^2
+        1)  |p_{nb_steps} - p_goal|^2
+        1)  |pd_{nb_steps} - pd_goal|^2
         2)  sum_k |u_k|^2
 
     Note that this is a weighted (not prioritized) minimization.
@@ -110,11 +116,12 @@ class PreviewControl(object):
         psi = zeros((self.x_dim, self.U_dim))
         G, h = [], []  # list of matrices for inequalities G * x <= h
         for k in xrange(N):
-            # Here: x_k = phi * x_init + psi * U
-            # State inequality: E * x_k <= f
-            # that is, (E * psi) * U <= f - (E * phi) * x_init
-            G.append(dot(self.E(k), psi))
-            h.append(self.f(k) - dot(dot(self.E(k), phi), self.x_init))
+            # x_k = phi * x_init + psi * U
+            # p_k = phi[:3] * x_init + psi[:3] * U
+            # E * p_k <= f
+            # (E * psi[:3]) * U <= f - (E * phi[:3]) * x_init
+            G.append(dot(self.E(k), psi[:3]))
+            h.append(self.f(k) - dot(dot(self.E(k), phi[:3]), self.x_init))
 
             # Now we update phi and psi for iteration k + 1
             phi = dot(self.A, phi)
@@ -129,27 +136,33 @@ class PreviewControl(object):
         if self.psi_last is None:
             self.compute_dynamics()
 
+        A = self.psi_last
+        b = self.x_goal - dot(self.phi_last, self.x_init)
+
         # Cost 1: sum_k u_k^2
         P1 = eye(self.U_dim)
         q1 = zeros(self.U_dim)
+        w1 = 1.
 
-        # Cost2: |x_N - x_goal|^2 = |A x - b|^2
-        A = self.psi_last
-        b = self.x_goal - dot(self.phi_last, self.x_init)
-        P2 = dot(A.T, A)
-        q2 = -dot(b.T, A)
+        # Cost 2: |p_N - p_goal|^2 = |A[:3] x - b[:3]|^2
+        P2 = dot(A[:3].T, A[:3])
+        q2 = -dot(b[:3].T, A[:3])
+        w2 = 1000.
+
+        # Cost 3: |pd_N - pd_goal|^3 = |A[3:] x - b[3:]|^3
+        P3 = dot(A[3:].T, A[3:])
+        q3 = -dot(b[3:].T, A[3:])
+        w3 = 10.
 
         # Weighted combination of all costs
-        w1 = 1.
-        w2 = 1000.
-        P = w1 * P1 + w2 * P2
-        q = w1 * q1 + w2 * q2
+        P = w1 * P1 + w2 * P2 + w3 * P3
+        q = w1 * q1 + w2 * q2 + w3 * q3
 
         # Inequality constraints
         G_control = block_diag(*[self.C(k) for k in xrange(self.nb_steps)])
         h_control = hstack([self.d(k) for k in xrange(self.nb_steps)])
-        G = vstack([G_control, self.G_state])
-        h = hstack([h_control, self.h_state])
+        # G = vstack([G_control, self.G_state])
+        # h = hstack([h_control, self.h_state])
         G = G_control
         h = h_control
         # G = self.G_state
@@ -157,31 +170,31 @@ class PreviewControl(object):
 
         self.U = solve_qp(P, q, G, h)
         import pylab
-        print "End error:", (
-            dot(self.U, dot(P2, self.U)) + 2 * dot(q2, self.U) +
-            dot(b.T, b))
-        print "End error:", pylab.norm(
-            dot(self.phi_last, self.x_init) + dot(self.psi_last, self.U) -
-            self.x_goal) ** 2
+        print "End cost (weighted):", (
+            .5 * dot(self.U, dot(P, self.U)) + dot(q, self.U))
+        print "End error (position):", pylab.norm(
+            dot(self.phi_last[:3], self.x_init) +
+            dot(self.psi_last[:3], self.U) -
+            self.x_goal[:3]) ** 2
+        print "End error (velocity):", pylab.norm(
+            dot(self.phi_last[3:], self.x_init) +
+            dot(self.psi_last[3:], self.U) -
+            self.x_goal[3:]) ** 2
 
 
-class COMAccelPreviewControl(PreviewControl):
+class COMPreviewControl(PreviewControl):
 
     def __init__(self, com_init, comd_init, com_goal, comd_goal, tube,
                  duration, switch_time, nb_steps):
         dT = duration / nb_steps
-        I, Z = eye(3), zeros((3, 3))
-        A = array(bmat([
-            [I, dT * I],
-            [Z, I]]))
-        B = array(bmat([
-            [.5 * dT ** 2 * I],
-            [dT * I]]))
+        I = eye(3)
+        A = array(bmat([[I, dT * I], [zeros((3, 3)), I]]))
+        B = array(bmat([[.5 * dT ** 2 * I], [dT * I]]))
         x_init = hstack([com_init, comd_init])
         x_goal = hstack([com_goal, comd_goal])
         switch_step = int(switch_time / dT)
         C, d, E, f = self.compute_inequalities(tube, switch_step, nb_steps)
-        super(COMAccelPreviewControl, self).__init__(
+        super(COMPreviewControl, self).__init__(
             A, B, C, d, E, f, x_init, x_goal, nb_steps)
         self.duration = duration
         self.switch_step = switch_step
@@ -199,8 +212,7 @@ class COMAccelPreviewControl(PreviewControl):
             return M
 
         C1, d1 = tube.compute_dual_hrep(stance_id=0)
-        E1_pos, f1 = tube.compute_primal_hrep(stance_id=0)
-        E1 = hstack([E1_pos, zeros(E1_pos.shape)])
+        E1, f1 = tube.compute_primal_hrep(stance_id=0)
         if switch_step >= nb_steps - 1:
             C = wrap_matrix(C1)
             d = wrap_matrix(d1)
@@ -208,8 +220,7 @@ class COMAccelPreviewControl(PreviewControl):
             f = wrap_matrix(f1)
         else:
             C2, d2 = tube.compute_dual_hrep(stance_id=1)
-            E2_pos, f2 = tube.compute_primal_hrep(stance_id=1)
-            E2 = hstack([E2_pos, zeros(E2_pos.shape)])
+            E2, f2 = tube.compute_primal_hrep(stance_id=1)
             C = multiplex_matrices(C1, C2, switch_step)
             d = multiplex_matrices(d1, d2, switch_step)
             E = multiplex_matrices(E1, E2, switch_step)
@@ -217,7 +228,7 @@ class COMAccelPreviewControl(PreviewControl):
         return (C, d, E, f)
 
 
-class FeedbackPreviewController(object):
+class COMPreviewLoop(object):
 
     def __init__(self, com, fsm, preview_buffer, nb_mpc_steps, tube_shape,
                  tube_radius, draw_cone=True, draw_tube=True):
@@ -274,15 +285,16 @@ class FeedbackPreviewController(object):
             print "target_com =", repr(target_com)
             print "switch_time =", switch_time
             print "horizon =", horizon
+            print "timestep = ", horizon / self.nb_mpc_steps
             print ""
             print "cur_stance.is_single_support =", \
                 cur_stance.is_single_support
             print "cur_stance.is_single_support =", \
                 self.fsm.cur_stance.is_single_support
         try:
-            preview_control = COMAccelPreviewControl(
-                cur_com, cur_comd, target_com, target_comd, self.tube,
-                horizon, switch_time, self.nb_mpc_steps)
+            preview_control = COMPreviewControl(
+                cur_com, cur_comd, target_com, target_comd, self.tube, horizon,
+                switch_time, self.nb_mpc_steps)
         except TubeError as e:
             print "Tube error: %s" % str(e)
             self.cone_handle = None

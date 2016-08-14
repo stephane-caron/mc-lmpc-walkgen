@@ -37,7 +37,7 @@ except ImportError:
     script_path = os.path.realpath(__file__)
     sys.path.append(os.path.dirname(script_path) + '/..')
     from mpc3d.buffer import PreviewBuffer
-    from mpc3d.control import FeedbackPreviewController
+    from mpc3d.control import COMPreviewLoop
     from mpc3d.fsm import StateMachine
     from mpc3d.simulation import Simulation
 
@@ -263,7 +263,7 @@ if __name__ == "__main__":
     preview_buffer = PreviewBuffer(
         com_pm,
         fsm)
-    mpc = FeedbackPreviewController(
+    mpc = COMPreviewLoop(
         com_pm,
         fsm,
         preview_buffer,
