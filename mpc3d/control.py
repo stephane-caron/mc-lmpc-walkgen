@@ -18,6 +18,8 @@
 # You should have received a copy of the GNU General Public License along with
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
+import time
+
 from tube import COMTube, TubeError
 from numpy import array, bmat, dot, eye, hstack, sqrt, vstack, zeros
 from pymanoid import PointMass, solve_qp
@@ -152,7 +154,7 @@ class PreviewControl(object):
         # Cost 3: |pd_N - pd_goal|^3 = |A[3:] x - b[3:]|^3
         P3 = dot(A[3:].T, A[3:])
         q3 = -dot(b[3:].T, A[3:])
-        w3 = 10.
+        w3 = 100.
 
         # Weighted combination of all costs
         P = w1 * P1 + w2 * P2 + w3 * P3
@@ -163,23 +165,28 @@ class PreviewControl(object):
         h_control = hstack([self.d(k) for k in xrange(self.nb_steps)])
         G = vstack([G_control, self.G_state])
         h = hstack([h_control, self.h_state])
-        # G = G_control
-        # h = h_control
+        G = G_control
+        h = h_control
         # G = self.G_state
         # h = self.h_state
 
+        t0 = time.time()
         self.U = solve_qp(P, q, G, h)
+        print "Solved QP in %.2f ms" % (1000. * (time.time() - t0))
         import pylab
         print "End cost (weighted):", (
             .5 * dot(self.U, dot(P, self.U)) + dot(q, self.U))
+        print "c1 =", .5 * dot(self.U, dot(P1, self.U)) + dot(q1, self.U)
+        print "c2 =", .5 * dot(self.U, dot(P2, self.U)) + dot(q2, self.U)
+        print "c3 =", .5 * dot(self.U, dot(P3, self.U)) + dot(q3, self.U)
         print "End error (position):", pylab.norm(
             dot(self.phi_last[:3], self.x_init) +
             dot(self.psi_last[:3], self.U) -
-            self.x_goal[:3]) ** 2
+            self.x_goal[:3])
         print "End error (velocity):", pylab.norm(
             dot(self.phi_last[3:], self.x_init) +
             dot(self.psi_last[3:], self.U) -
-            self.x_goal[3:]) ** 2
+            self.x_goal[3:])
 
 
 class COMPreviewControl(PreviewControl):
@@ -245,10 +252,11 @@ class COMPreviewLoop(object):
         - ``tube_shape`` -- number of vertices of the COM trajectory tube
         - ``tube_radius`` -- tube radius (in L1 norm)
         """
+        self.com = com
         self.draw_cone = draw_cone
         self.draw_tube = draw_tube
-        self.com = com
         self.fsm = fsm
+        self.last_phase_id = -1
         self.nb_mpc_steps = nb_mpc_steps
         self.preview_buffer = preview_buffer
         self.target_box = PointMass(fsm.cur_stance.com, 30., color='g')
@@ -273,10 +281,20 @@ class COMPreviewLoop(object):
         preview_targets = self.fsm.get_preview_targets()
         switch_time, horizon, target_com = preview_targets
         target_comd = zeros(3)
+
+        target_moved = norm(target_com - self.target_box.p) > 1e-3
+        phase_switched = self.fsm.phase_id > self.last_phase_id
         self.target_box.set_pos(target_com)
-        self.tube = COMTube(
-            cur_com, target_com, cur_stance, next_stance, self.tube_shape,
-            self.tube_radius)
+        self.last_phase_id = self.fsm.phase_id
+        if True or not self.tube or target_moved or phase_switched or \
+                not self.tube.contains(cur_com):
+            print "Recomputing tube..."
+            self.tube = COMTube(
+                cur_com, target_com, cur_stance, next_stance, self.tube_shape,
+                self.tube_radius)
+        else:
+            print "Keeping current tube"
+
         if self.draw_tube:
             self.tube_handle = self.tube.draw_primal_polytopes()
         if True:
@@ -298,7 +316,7 @@ class COMPreviewLoop(object):
         except TubeError as e:
             print "Tube error: %s" % str(e)
             self.cone_handle = None
-            sim.stop()
+            self.tube = None
             return
         preview_control.compute_dynamics()
         try:

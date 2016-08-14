@@ -76,6 +76,7 @@ class StateMachine(object):
         self.left_foot_traj_handles = []
         self.nb_contacts = len(contacts)
         self.next_contact_id = 2 if init_phase == 'DS-R' else 3  # kroooon
+        self.phase_id = -1  # 0 will be the first SS phase
         self.rem_time = 0.  # initial state is assumed at end of DS phase
         self.right_foot_traj_handles = []
         self.ss_duration = ss_duration
@@ -156,6 +157,7 @@ class StateMachine(object):
             self.ds_duration if self.cur_stance.is_double_support \
             else self.ss_duration
         self.rem_time = self.cur_duration
+        self.phase_id += 1
         if self.callback is not None:
             self.callback()
 
