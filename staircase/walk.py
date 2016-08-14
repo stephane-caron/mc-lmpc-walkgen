@@ -259,19 +259,19 @@ if __name__ == "__main__":
         step_dim_x=0.2,
         step_dim_y=0.1)
 
-    com_pm = PointMass([0, 0, 0], robot_mass)
+    com = PointMass([0, 0, 0], robot_mass)
+    preview_buffer = PreviewBuffer(com)
     fsm = StateMachine(
-        staircase, com_pm, 'DS-R',
+        staircase,
+        com,
+        'DS-R',
         ss_duration=ss_duration,
         ds_duration=ds_duration,
         init_com_offset=array([0.05, 0., 0.]),
         cyclic=True,
         callback=fsm_callback)
-    preview_buffer = PreviewBuffer(
-        com_pm,
-        fsm)
     mpc = COMPreviewLoop(
-        com_pm,
+        com,
         fsm,
         preview_buffer,
         nb_mpc_steps=10,
