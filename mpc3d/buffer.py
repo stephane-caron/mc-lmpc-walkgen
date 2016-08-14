@@ -20,10 +20,10 @@
 
 from numpy import zeros
 from pymanoid import draw_line
-from threading import Lock, Thread
+from threading import Lock
 
 
-class COMAccelBuffer(object):
+class PreviewBuffer(object):
 
     """
     These buffers store COM accelerations output by the preview controller and
@@ -32,17 +32,13 @@ class COMAccelBuffer(object):
 
     def __init__(self, com, fsm, show_past=False, show_preview=True):
         self.com = com
-        self.comd = zeros(3)
-        self.comdd = zeros(3)
         self.preview_index = 0
         self.preview_lock = Lock()
-        self.comdd_vector = None
         self.fsm = fsm
         self.preview = None
         self.past_handles = [] if show_past else None
         self.preview_handles = [] if show_preview else None
-        self.thread = None
-        self.thread_lock = Lock()
+        self.rem_time = 0.
 
     def update_preview(self, preview):
         with self.preview_lock:
@@ -72,44 +68,21 @@ class COMAccelBuffer(object):
         """Returns True when preview was updated since last read."""
         return self.preview_index == 0
 
-    def start_thread(self, sim):
-        self.thread = Thread(target=self.run_thread, args=(sim,))
-        self.thread.daemon = True
-        self.thread.start()
-
-    def pause_thread(self):
-        self.thread_lock.acquire()
-
-    def resume_thread(self):
-        self.thread_lock.release()
-
-    def stop_thread(self):
-        self.thread_lock = None
-
-    def run_thread(self, sim):
-        comdd = zeros(3)
-        while self.thread_lock:
-            with self.thread_lock:
-                sim.sync_loop('com_buffer')
-                (comdd, dT) = self.get_next_preview_window()
-                self.euler_integrate(comdd, dT)
-                sim.sleep(dT)
-
-    def euler_integrate(self, comdd, dt):
+    def on_tick(self, sim):
+        if self.preview_was_updated:
+            (comdd, rem_time) = self.get_next_preview_window()
         com0 = self.com.p
-        self.com.set_pos(com0 + self.comd * dt + comdd * .5 * dt ** 2)
-        self.comd += comdd * dt
-        self.comdd = comdd
+        self.com.integrate_acceleration(comdd, sim.dt)
         if self.past_handles is not None:
             self.past_handles.append(
                 draw_line(com0, self.com.p, color='b', linewidth=3))
+        self.rem_time -= sim.dt
 
     def clear_preview(self):
         self.preview_handles = []
 
     def draw_preview(self):
-        com = self.com.p
-        comd = self.comd
+        com, comd = self.com.p, self.com.pd
         dT = self.preview.timestep
         for preview_index in xrange(len(self.preview.U) / 3):
             com0 = com

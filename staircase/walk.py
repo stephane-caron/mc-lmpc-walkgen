@@ -32,13 +32,13 @@ except ImportError:
     import pymanoid
 
 try:
-    from mpc3d.buffer import COMAccelBuffer  # whatever
+    from mpc3d.buffer import PreviewBuffer  # whatever
 except ImportError:
     script_path = os.path.realpath(__file__)
     sys.path.append(os.path.dirname(script_path) + '/..')
-    from mpc3d.buffer import COMAccelBuffer
+    from mpc3d.buffer import PreviewBuffer
     from mpc3d.control import FeedbackPreviewController
-    from mpc3d.fsm import StanceFSM
+    from mpc3d.fsm import StateMachine
     from mpc3d.simulation import Simulation
 
 from numpy import arange, cos, hstack, pi, sin, zeros, array
@@ -131,7 +131,7 @@ def prepare_screenshot(scrot_time=38.175):
     # empty_gui_list(gui_handles['forces'])
     # empty_gui_list(gui_handles['static'])
     mpc.target_box.hide()
-    com_buffer.com.set_visible(False)
+    preview_buffer.com.set_visible(False)
     robot.set_transparency(0)
     viewer.SetBkgndColor([1, 1, 1])
     dash_graph_handles(fsm.left_foot_traj_handles)
@@ -146,7 +146,7 @@ def update_sep():
     else:  # fsm.cur_stance.is_double_support:
         ss_stance = fsm.next_stance
         ds_stance = fsm.cur_stance
-    sep_height = com_buffer.com.z - RobotModel.leg_length
+    sep_height = preview_buffer.com.z - RobotModel.leg_length
     gui_handles['static-ss'] = draw_polygon(
         [(x[0], x[1], sep_height) for x in ss_stance.sep],
         normal=[0, 0, 1], color='c')
@@ -160,19 +160,19 @@ def update_robot_ik():
         robot.ik.remove_task(robot.left_foot.name)
         robot.ik.remove_task(robot.right_foot.name)
         if fsm.cur_stance.left_foot is not None:
-            robot.ik.add_task(
-                ContactTask(robot, robot.left_foot, fsm.cur_stance.left_foot))
+            left_foot_task = ContactTask(
+                robot, robot.left_foot, fsm.cur_stance.left_foot)
         else:  # left_foot is free
-            fsm.free_foot.reset(robot.left_foot.pose, fsm.next_contact.pose)
-            robot.ik.add_task(
-                LinkPoseTask(robot, robot.left_foot, fsm.free_foot))
+            left_foot_task = LinkPoseTask(
+                robot, robot.left_foot, fsm.free_foot)
         if fsm.cur_stance.right_foot is not None:
-            robot.ik.add_task(
-                ContactTask(robot, robot.right_foot, fsm.cur_stance.right_foot))
+            right_foot_task = ContactTask(
+                robot, robot.right_foot, fsm.cur_stance.right_foot)
         else:  # right_foot is free
-            fsm.free_foot.reset(robot.right_foot.pose, fsm.next_contact.pose)
-            robot.ik.add_task(
-                LinkPoseTask(robot, robot.right_foot, fsm.free_foot))
+            right_foot_task = LinkPoseTask(
+                robot, robot.right_foot, fsm.free_foot)
+        robot.ik.add_task(left_foot_task)
+        robot.ik.add_task(right_foot_task)
 
 
 def fsm_callback():
@@ -216,11 +216,11 @@ class ForcesThread(PausableThread):
     def step(self):
         """Find supporting contact forces at each COM acceleration update."""
         sim.sync('forces')
-        comdd = com_buffer.comdd
+        comdd = preview_buffer.comdd
         gravity = pymanoid.get_gravity()
         wrench = hstack([robot_mass * (comdd - gravity), zeros(3)])
         support = fsm.cur_stance.find_supporting_forces(
-            wrench, com_buffer.com.p, robot_mass, 10.)
+            wrench, preview_buffer.com.p, robot_mass, 10.)
         if not support:
             gui_handles['forces'] = []
             viewer.SetBkgndColor([.8, .4, .4])
@@ -248,20 +248,28 @@ if __name__ == "__main__":
         angular_step=0.5,
         height=1.4,
         roughness=0.5,
-        friction=0.7,
+        friction=0.9,
         step_dim_x=0.2,
         step_dim_y=0.1)
 
     com_pm = PointMass([0, 0, 0], robot_mass)
-    fsm = StanceFSM(
+    fsm = StateMachine(
         staircase, com_pm, 'DS-R',
         ss_duration=1.0,
         ds_duration=0.5,
         init_com_offset=array([0.05, 0., 0.]),
-        cyclic=True)
-    com_buffer = COMAccelBuffer(com_pm, fsm)
+        cyclic=True,
+        callback=fsm_callback)
+    preview_buffer = PreviewBuffer(
+        com_pm,
+        fsm)
     mpc = FeedbackPreviewController(
-        fsm, com_buffer, nb_mpc_steps=10, tube_shape=8, tube_radius=0.04)
+        com_pm,
+        fsm,
+        preview_buffer,
+        nb_mpc_steps=10,
+        tube_shape=8,
+        tube_radius=0.02)
 
     with robot_lock:
         robot.set_dof_values(robot.q_halfsit)
@@ -283,7 +291,7 @@ if __name__ == "__main__":
             })
         robot.set_dof_values([2.], [robot.TRANS_Z])  # start PG from above
         robot.generate_posture(fsm.cur_stance, max_it=200)
-        robot.ik.tasks['com'].update_target(com_buffer.com)
+        robot.ik.tasks['com'].update_target(preview_buffer.com)
         robot.ik.add_task(MinCAMTask(robot, weight=0.1))
 
         try:  # HRP-4
@@ -304,15 +312,16 @@ if __name__ == "__main__":
                 DOFTask(robot, robot.ROT_P, 0., gain=0.9, weight=0.5))
 
     sim = Simulation(dt=3e-2)
-    fsm.start_thread(sim, fsm_callback)
-    com_buffer.start_thread(sim)
-    mpc.start_thread(sim)
+    sim.add_callback(fsm.on_tick)
+    sim.add_callback(preview_buffer.on_tick)
+    sim.add_callback(mpc.on_tick)
     robot.start_ik_thread(3e-2)
 
     fsm_callback()  # show SE polygons at startup
 
     set_camera_1()
-    print """
+    if False:
+        print """
 
 Multi-contact WPG based on Model Preview Control of 3D COM Accelerations
 ========================================================================
@@ -325,14 +334,14 @@ Ready to go! You can control the simulation by:
 You can access all state variables via this IPython shell.
 Here is the list of global objects. Use <TAB> to see what's inside.
 
-    com_buffer -- stores MPC output and feeds it to the IK
+    preview_buffer -- stores MPC output and feeds it to the IK
     fsm -- finite state machine
     mpc -- model-preview controller
     robot -- kinematic model of the robot (includes IK solver)
 
 For example:
 
-    com_buffer.comdd -- desired COM acceleration
+    preview_buffer.comdd -- desired COM acceleration
     fsm.cur_stance -- current stance (contacts + target COM)
     mpc.hide_cone() -- hide drawing of preview COM acceleration cone
     robot.com -- robot COM position from kinematic model

@@ -20,9 +20,8 @@
 
 from tube import COMTube, TubeError
 from numpy import array, bmat, dot, eye, hstack, sqrt, vstack, zeros
-from pymanoid import PointMass, solve_qp, draw_arrow
+from pymanoid import PointMass, solve_qp
 from scipy.linalg import block_diag
-from threading import Lock, Thread
 from warnings import warn
 
 
@@ -151,8 +150,8 @@ class PreviewControl(object):
         h_control = hstack([self.d(k) for k in xrange(self.nb_steps)])
         G = vstack([G_control, self.G_state])
         h = hstack([h_control, self.h_state])
-        # G = G_control
-        # h = h_control
+        G = G_control
+        h = h_control
         # G = self.G_state
         # h = self.h_state
 
@@ -220,25 +219,27 @@ class COMAccelPreviewControl(PreviewControl):
 
 class FeedbackPreviewController(object):
 
-    def __init__(self, fsm, com_buffer, nb_mpc_steps, tube_shape, tube_radius,
-                 draw_cone=True, draw_tube=True):
+    def __init__(self, com, fsm, preview_buffer, nb_mpc_steps, tube_shape,
+                 tube_radius, draw_cone=True, draw_tube=True):
         """
         Create a new feedback controller that continuously runs the preview
         controller and sends outputs to a COMAccelBuffer.
 
         INPUT:
 
+        - ``com`` -- PointMass containing current COM state
         - ``fsm`` -- instance of finite state machine
-        - ``com_buffer`` -- COMAccelBuffer to send MPC outputs to
+        - ``preview_buffer`` -- COMAccelBuffer to send MPC outputs to
         - ``nb_mpc_steps`` -- discretization step of the preview window
         - ``tube_shape`` -- number of vertices of the COM trajectory tube
         - ``tube_radius`` -- tube radius (in L1 norm)
         """
-        self.com_buffer = com_buffer
         self.draw_cone = draw_cone
         self.draw_tube = draw_tube
+        self.com = com
         self.fsm = fsm
         self.nb_mpc_steps = nb_mpc_steps
+        self.preview_buffer = preview_buffer
         self.target_box = PointMass(fsm.cur_stance.com, 30., color='g')
         self.thread = None
         self.thread_lock = None
@@ -253,70 +254,50 @@ class FeedbackPreviewController(object):
         self.draw_cones = False
         self.cone_handle = None
 
-    def start_thread(self, sim):
-        self.thread_lock = Lock()
-        self.thread = Thread(target=self.run_thread, args=(sim,))
-        self.thread.daemon = True
-        self.thread.start()
-
-    def pause_thread(self):
-        self.thread_lock.acquire()
-
-    def resume_thread(self):
-        self.thread_lock.release()
-
-    def stop_thread(self):
-        self.thread_lock = None
-
-    def run_thread(self, sim):
+    def on_tick(self, sim):
+        cur_com = self.com.p
+        cur_comd = self.com.pd
+        cur_stance = self.fsm.cur_stance
+        next_stance = self.fsm.next_stance
+        preview_targets = self.fsm.get_preview_targets()
+        switch_time, horizon, target_com = preview_targets
         target_comd = zeros(3)
-        while self.thread_lock:
-            sim.sync_loop('control')
-            cur_com = self.com_buffer.com.p
-            cur_comd = self.com_buffer.comd
-            cur_stance = self.fsm.cur_stance
-            next_stance = self.fsm.next_stance
-            switch_time, horizon, target_com = self.fsm.get_preview_targets()
-            self.target_box.set_pos(target_com)
-            self.tube = COMTube(
-                cur_com, target_com, cur_stance, next_stance, self.tube_shape,
-                self.tube_radius)
-            if self.draw_tube:
-                self.tube_handle = self.tube.draw_primal_polytopes()
-            dt = 3e-2
-            if dot(cur_comd, cur_comd) > 1e-2:
-                self.comd_handle = draw_arrow(cur_com, cur_com + cur_comd * dt)
-            if True:
-                print "\ncur_com =", repr(cur_com)
-                print "cur_comd =", repr(cur_comd)
-                print "target_com =", repr(target_com)
-                print "target_comd =", repr(target_comd)
-                print "switch_time =", switch_time
-                print "horizon =", horizon
-                print ""
-                print "cur_stance.is_single_support =", \
-                    cur_stance.is_single_support
-                print "cur_stance.is_single_support =", \
-                    self.fsm.cur_stance.is_single_support
-            try:
-                preview_control = COMAccelPreviewControl(
-                    cur_com, cur_comd, target_com, target_comd, self.tube,
-                    horizon, switch_time, self.nb_mpc_steps)
-            except TubeError as e:
-                print "Tube error: %s" % str(e)
-                self.cone_handle = None
-                sim.stop()
-                continue
-            preview_control.compute_dynamics()
-            try:
-                preview_control.compute_control()
-                self.com_buffer.update_preview(preview_control)
-            except ValueError as e:
-                warn("MPC: couldn't solve QP, maybe inconsistent constraints?")
-                print "Exception:", e
-                sim.stop()
-            try:
-                if self.draw_cone:
-                    self.cone_handle = self.tube.draw_dual_cones()
-            except TubeError as e:
-                print "Tube error (drawing): %s" % str(e)
+        self.target_box.set_pos(target_com)
+        self.tube = COMTube(
+            cur_com, target_com, cur_stance, next_stance, self.tube_shape,
+            self.tube_radius)
+        if self.draw_tube:
+            self.tube_handle = self.tube.draw_primal_polytopes()
+        if True:
+            print "\ncur_com =", repr(cur_com)
+            print "cur_comd =", repr(cur_comd)
+            print "target_com =", repr(target_com)
+            print "switch_time =", switch_time
+            print "horizon =", horizon
+            print ""
+            print "cur_stance.is_single_support =", \
+                cur_stance.is_single_support
+            print "cur_stance.is_single_support =", \
+                self.fsm.cur_stance.is_single_support
+        try:
+            preview_control = COMAccelPreviewControl(
+                cur_com, cur_comd, target_com, target_comd, self.tube,
+                horizon, switch_time, self.nb_mpc_steps)
+        except TubeError as e:
+            print "Tube error: %s" % str(e)
+            self.cone_handle = None
+            sim.stop()
+            return
+        preview_control.compute_dynamics()
+        try:
+            preview_control.compute_control()
+            self.preview_buffer.update_preview(preview_control)
+        except ValueError as e:
+            warn("MPC: couldn't solve QP, maybe inconsistent constraints?")
+            print "Exception:", e
+            sim.stop()
+        try:
+            if self.draw_cone:
+                self.cone_handle = self.tube.draw_dual_cones()
+        except TubeError as e:
+            print "Tube error (drawing): %s" % str(e)

@@ -18,85 +18,59 @@
 # You should have received a copy of the GNU General Public License along with
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
-import threading
 import time
+
+from threading import Lock, Thread
 
 
 class Simulation(object):
 
-    def __init__(self, dt, slowdown=None):
+    def __init__(self, dt):
         """
         Create a new simulation object.
 
         INPUT:
 
         - ``dt`` -- time interval between two ticks in simulation time
-        - ``slowdown`` -- ratio from simulation time to real time
         """
-        self.__sleep_dt = slowdown * dt if slowdown else dt
+        self.callbacks = []
         self.dt = dt
-        self.event = threading.Event()
-        self.loop_start = {}
-        self.slowdown = slowdown
-        self.start_time = time.time()
+        self.is_running = False
+        self.tick_time = 0
+        self.state_lock = Lock()
 
-    @property
-    def is_started(self):
-        return self.event.isSet()
+    def __del__(self):
+        """Close thread at shutdown."""
+        self.stop()
 
-    def pause(self):
-        self.event.clear()
+    def add_callback(self, callback):
+        """Add a function called after each tick (insertion order matters)."""
+        self.callbacks.append(callback)
 
-    def resume(self):
-        self.event.set()
-
-    def sleep(self, dT=None):
-        """
-        Delay execution for a duration ``dT`` in simulation time.
-
-        INPUT:
-
-        - ``dT`` -- sleep duration in simulation time
-        """
-        if dT is None:
-            return time.sleep(self.__sleep_dt)
-        elif self.slowdown:
-            return time.sleep(self.slowdown * dT)
-        return time.sleep(dT)
+    def run_thread(self):
+        """Run simulation thread."""
+        while self.is_running:
+            self.step()
 
     def start(self):
-        self.event.set()
+        """Start simulation thread. """
+        self.is_running = True
+        self.thread = Thread(target=self.run_thread, args=())
+        self.thread.start()
 
-    def step(self, nb_steps=1):
-        self.event.set()
-        self.event.clear()
-        while nb_steps > 1:
-            nb_steps -= 1
-            self.sleep(self.dt)
-            self.event.set()
-            self.event.clear()
+    def step(self, n=1):
+        """Perform one simulation step."""
+        for _ in xrange(n):
+            t0 = time.time()
+            with self.state_lock:
+                for callback in self.callbacks:
+                    callback(self)
+            rem_time = self.dt - (time.time() - t0)
+            if rem_time > 1e-4:
+                time.sleep(rem_time)
+            elif rem_time < -1e-4:
+                print "Time budget exhausted by %.1f ms" % (-1000. * rem_time)
+            self.tick_time += 1
 
     def stop(self):
-        self.event.clear()
-
-    def sync_loop(self, name):
-        """
-        Check that the loop of the process identified by ``name`` does not
-        execute faster than ``self.dt``.
-
-        INPUT:
-
-        - ``name`` -- identifier of caller thread
-        """
-        self.event.wait()
-        cur_time = self.time()
-        if name in self.loop_start:
-            sim_elapsed = cur_time - self.loop_start[name]
-            if sim_elapsed < self.dt:
-                self.sleep(self.dt - sim_elapsed)
-        self.loop_start[name] = cur_time
-
-    def time(self):
-        if self.slowdown:
-            return self.slowdown * (time.time() - self.start_time)
-        return time.time() - self.start_time
+        self.is_running = False
