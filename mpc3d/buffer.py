@@ -20,10 +20,11 @@
 
 from numpy import zeros
 from pymanoid import draw_line, draw_point
+from simulation import Process
 from threading import Lock
 
 
-class PreviewBuffer(object):
+class PreviewBuffer(Process):
 
     """
     These buffers store COM accelerations output by the preview controller and

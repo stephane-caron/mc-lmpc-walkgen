@@ -21,10 +21,11 @@
 
 from free_foot import FreeFoot
 from pymanoid import draw_line
+from simulation import Process
 from stance import Stance
 
 
-class StateMachine(object):
+class StateMachine(Process):
 
     transitions = {
         'DS-L': 'SS-L',

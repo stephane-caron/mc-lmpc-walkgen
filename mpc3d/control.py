@@ -24,6 +24,7 @@ from tube import COMTube, TubeError
 from numpy import array, bmat, dot, eye, hstack, sqrt, vstack, zeros
 from pymanoid import PointMass, solve_qp
 from scipy.linalg import block_diag
+from simulation import Process
 from warnings import warn
 
 
@@ -173,17 +174,11 @@ class PreviewControl(object):
         t0 = time.time()
         self.U = solve_qp(P, q, G, h)
         print "Solved QP in %.2f ms" % (1000. * (time.time() - t0))
-        import pylab
-        print "End cost (weighted):", (
-            .5 * dot(self.U, dot(P, self.U)) + dot(q, self.U))
-        print "c1 =", .5 * dot(self.U, dot(P1, self.U)) + dot(q1, self.U)
-        print "c2 =", .5 * dot(self.U, dot(P2, self.U)) + dot(q2, self.U)
-        print "c3 =", .5 * dot(self.U, dot(P3, self.U)) + dot(q3, self.U)
-        print "End error (position):", pylab.norm(
+        print "End error (position):", norm(
             dot(self.phi_last[:3], self.x_init) +
             dot(self.psi_last[:3], self.U) -
             self.x_goal[:3])
-        print "End error (velocity):", pylab.norm(
+        print "End error (velocity):", norm(
             dot(self.phi_last[3:], self.x_init) +
             dot(self.psi_last[3:], self.U) -
             self.x_goal[3:])
@@ -235,10 +230,10 @@ class COMPreviewControl(PreviewControl):
         return (C, d, E, f)
 
 
-class COMPreviewLoop(object):
+class TubePreviewControl(Process):
 
     def __init__(self, com, fsm, preview_buffer, nb_mpc_steps, tube_shape,
-                 tube_radius, draw_cone=True, draw_tube=True):
+                 tube_radius):
         """
         Create a new feedback controller that continuously runs the preview
         controller and sends outputs to a COMAccelBuffer.
@@ -247,14 +242,12 @@ class COMPreviewLoop(object):
 
         - ``com`` -- PointMass containing current COM state
         - ``fsm`` -- instance of finite state machine
-        - ``preview_buffer`` -- COMAccelBuffer to send MPC outputs to
+        - ``preview_buffer`` -- PreviewBuffer to send MPC outputs to
         - ``nb_mpc_steps`` -- discretization step of the preview window
         - ``tube_shape`` -- number of vertices of the COM trajectory tube
         - ``tube_radius`` -- tube radius (in L1 norm)
         """
         self.com = com
-        self.draw_cone = draw_cone
-        self.draw_tube = draw_tube
         self.fsm = fsm
         self.last_phase_id = -1
         self.nb_mpc_steps = nb_mpc_steps
@@ -265,13 +258,6 @@ class COMPreviewLoop(object):
         self.tube = None
         self.tube_radius = tube_radius
         self.tube_shape = tube_shape
-
-    def show_cone(self):
-        self.draw_cone = True
-
-    def hide_cone(self):
-        self.draw_cones = False
-        self.cone_handle = None
 
     def on_tick(self, sim):
         cur_com = self.com.p
@@ -293,30 +279,21 @@ class COMPreviewLoop(object):
                 self.tube_radius)
         else:
             print "Keeping current tube"
-
-        if self.draw_tube:
-            self.tube_handle = self.tube.draw_primal_polytopes()
         if True:
-            print "\ncur_com =", repr(cur_com)
-            print "target_com =", repr(target_com)
-            print "|cur_comd| =", norm(cur_comd)
-            print "|target_comd| =", norm(target_comd)
-            print "switch_time =", switch_time
-            print "horizon =", horizon
-            print "timestep = ", horizon / self.nb_mpc_steps
-            print ""
-            print "cur_stance.is_single_support =", \
-                cur_stance.is_single_support
-            print "cur_stance.is_single_support =", \
-                self.fsm.cur_stance.is_single_support
+            print "\nVelocities:"
+            print "- |cur_comd| =", norm(cur_comd)
+            print "- |target_comd| =", norm(target_comd)
+            print "\nTime:"
+            print "- horizon =", horizon
+            print "- switch_time =", switch_time
+            print "- timestep = ", horizon / self.nb_mpc_steps
+            print""
         try:
             preview_control = COMPreviewControl(
                 cur_com, cur_comd, target_com, target_comd, self.tube, horizon,
                 switch_time, self.nb_mpc_steps)
         except TubeError as e:
             print "Tube error: %s" % str(e)
-            self.cone_handle = None
-            self.tube = None
             return
         preview_control.compute_dynamics()
         try:
@@ -326,8 +303,3 @@ class COMPreviewLoop(object):
             warn("MPC: couldn't solve QP, maybe inconsistent constraints?")
             print "Exception:", e
             sim.stop()
-        try:
-            if self.draw_cone:
-                self.cone_handle = self.tube.draw_dual_cones()
-        except TubeError as e:
-            print "Tube error (drawing): %s" % str(e)

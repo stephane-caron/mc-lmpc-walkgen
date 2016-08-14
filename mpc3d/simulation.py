@@ -23,38 +23,47 @@ import time
 from threading import Thread
 
 
+class Process(object):
+
+    def on_tick(self, sim):
+        """Function called by the Simulation parent after each clock tick."""
+        pass
+
+
 class Simulation(object):
 
-    def __init__(self, dt):
+    def __init__(self, dt, profile=False):
         """
         Create a new simulation object.
 
         INPUT:
 
         - ``dt`` -- time interval between two ticks in simulation time
+        - ``profile`` -- when True, reports computation times for each Process
         """
-        self.callbacks = []
-        self.extra_callbacks = []
         self.dt = dt
+        self.extras = []
         self.is_running = False
+        self.processes = []
+        self.profile = profile
         self.tick_time = 0
 
     def __del__(self):
         """Close thread at shutdown."""
         self.stop()
 
-    def add_callback(self, callback):
-        """Add a function called after each tick (insertion order matters)."""
-        self.callbacks.append(callback)
-
-    def add_extra_callback(self, callback):
-        """Same as callbacks, but not part of the computation time budget."""
-        self.extra_callbacks.append(callback)
-
     def run_thread(self):
         """Run simulation thread."""
         while self.is_running:
             self.step()
+
+    def schedule(self, process):
+        """Add a Process to the schedule list (insertion order matters)."""
+        self.processes.append(process)
+
+    def schedule_extra(self, process):
+        """Schedule a Process not counted in the computation time budget."""
+        self.extras.append(process)
 
     def start(self):
         """Start simulation thread. """
@@ -67,14 +76,19 @@ class Simulation(object):
         """Perform one simulation step."""
         for _ in xrange(n):
             t0 = time.time()
-            for callback in self.callbacks:
-                callback(self)
+            for process in self.processes:
+                if self.profile:
+                    tp0 = time.time()
+                process.on_tick(self)
+                if self.profile:
+                    time_ms = 1000. * (time.time() - tp0)
+                    print "%s:\t%.1f ms" % (process.__class__.__name__, time_ms)
             rem_time = self.dt - (time.time() - t0)
             if rem_time < -1e-4:
                 print "Time time exhausted by %.1f ms" % (-1000. * rem_time)
-            if self.extra_callbacks:
-                for callback in self.extra_callbacks:
-                    callback(self)
+            if self.extras:
+                for process in self.extras:
+                    process.on_tick(self)
                 rem_time = self.dt - (time.time() - t0)
             if rem_time > 1e-4:
                 time.sleep(rem_time)

@@ -25,11 +25,14 @@ import time
 import threading
 
 try:
-    import pymanoid
+    from pymanoid import init
 except ImportError:
     script_path = os.path.realpath(__file__)
     sys.path.append(os.path.dirname(script_path) + '/../pymanoid')
-    import pymanoid
+    from pymanoid import init, draw_line, draw_points, get_gravity, get_viewer
+    from pymanoid import draw_force, draw_polygon, Contact, PointMass
+    from pymanoid.tasks import ContactTask, DOFTask, LinkPoseTask, MinCAMTask
+    from pymanoid import set_camera_top
 
 try:
     from mpc3d.buffer import PreviewBuffer  # whatever
@@ -37,14 +40,12 @@ except ImportError:
     script_path = os.path.realpath(__file__)
     sys.path.append(os.path.dirname(script_path) + '/..')
     from mpc3d.buffer import PreviewBuffer
-    from mpc3d.control import COMPreviewLoop
+    from mpc3d.control import TubePreviewControl
     from mpc3d.fsm import StateMachine
-    from mpc3d.simulation import Simulation
+    from mpc3d.simulation import Process, Simulation
 
 from numpy import arange, cos, hstack, pi, sin, zeros, array
 from numpy.random import random, seed
-from pymanoid import draw_force, draw_polygon, Contact, PointMass
-from pymanoid.tasks import ContactTask, DOFTask, LinkPoseTask, MinCAMTask
 
 try:
     from hrp4_pymanoid import HRP4 as RobotModel
@@ -114,7 +115,7 @@ def dash_graph_handles(handles):
 
 
 def set_camera_0():
-    pymanoid.get_viewer().SetCamera([
+    get_viewer().SetCamera([
         [0.97248388,  0.01229851, -0.23264533,  2.34433222],
         [0.21414823, -0.44041135,  0.87188209, -2.02105641],
         [-0.0917368, -0.89771186, -0.43092664,  3.40723848],
@@ -122,7 +123,7 @@ def set_camera_0():
 
 
 def set_camera_1():
-    pymanoid.get_viewer().SetCamera([
+    get_viewer().SetCamera([
         [1., 0.,  0., -7.74532557e-04],
         [0., 0.,  1., -4.99819374e+00],
         [0., -1., 0., 1.7],
@@ -169,7 +170,7 @@ def fsm_callback():
     update_robot_ik()
 
 
-class ForceHandles(object):
+class ForceDrawer(Process):
 
     def __init__(self):
         self.last_bkgnd_switch = None
@@ -178,7 +179,7 @@ class ForceHandles(object):
     def on_tick(self, sim):
         """Find supporting contact forces at each COM acceleration update."""
         comdd = preview_buffer.comdd
-        gravity = pymanoid.get_gravity()
+        gravity = get_gravity()
         wrench = hstack([robot_mass * (comdd - gravity), zeros(3)])
         support = fsm.cur_stance.find_supporting_forces(
             wrench, preview_buffer.com.p, robot_mass, 10.)
@@ -195,7 +196,7 @@ class ForceHandles(object):
             self.last_bkgnd_switch = None
 
 
-class SEPHandles(object):
+class SEPDrawer(Process):
 
     def __init__(self):
         self.ss_handles = None
@@ -217,10 +218,37 @@ class SEPHandles(object):
             normal=[0, 0, 1], color='y')
 
 
+class TubeDrawer(Process):
+
+    def __init__(self):
+        self.comdd_handle = []
+        self.cone_handles = []
+        self.poly_handles = []
+
+    def on_tick(self, sim):
+        scale = 0.05
+        try:
+            self.poly_handles = mpc.tube.draw_primal_polytopes()
+        except Exception as e:
+            print "Drawing of polytopes failed: %s" % str(e)
+        try:
+            self.cone_handles = mpc.tube.draw_dual_cones(
+                apex=[0., 0., scale * 9.81], scale=scale)
+        except Exception as e:
+            print "Drawing of dual cones failed: %s" % str(e)
+        comdd = scale * preview_buffer.comdd
+        self.comdd_handle = [
+            draw_line([0, 0, 0], comdd, color='r', linewidth=3),
+            draw_points([[0, 0, 0], comdd], color='r', pointsize=0.005)]
+
+
+def set_camera_cones():
+    set_camera_top(x=0, y=0, z=0.1 * 9.81)
+
 if __name__ == "__main__":
     seed(42)
-    pymanoid.init()
-    viewer = pymanoid.get_viewer()
+    init()
+    viewer = get_viewer()
     set_camera_0()
     robot = RobotModel(download_if_needed=True)
     robot_mass = robot.mass  # saved here to avoid taking robot_lock
@@ -246,7 +274,7 @@ if __name__ == "__main__":
         init_com_offset=array([0.05, 0., 0.]),
         cyclic=True,
         callback=fsm_callback)
-    mpc = COMPreviewLoop(
+    mpc = TubePreviewControl(
         com,
         fsm,
         preview_buffer,
@@ -294,16 +322,18 @@ if __name__ == "__main__":
             robot.ik.add_task(
                 DOFTask(robot, robot.ROT_P, 0., gain=0.9, weight=0.5))
 
-    sim = Simulation(dt)
-    sim.add_callback(fsm.on_tick)
-    sim.add_callback(preview_buffer.on_tick)
-    sim.add_callback(mpc.on_tick)
+    sim = Simulation(dt=dt, profile=True)
+    sim.schedule(fsm)
+    sim.schedule(preview_buffer)
+    sim.schedule(mpc)
     robot.start_ik_thread(dt)
 
-    sep = SEPHandles()
-    forces = ForceHandles()
-    sim.add_extra_callback(sep.on_tick)
-    sim.add_extra_callback(forces.on_tick)
+    forces = ForceDrawer()
+    sep = SEPDrawer()
+    tube = TubeDrawer()
+    sim.schedule_extra(forces)
+    sim.schedule_extra(sep)
+    sim.schedule_extra(tube)
 
     fsm_callback()  # show SE polygons at startup
 

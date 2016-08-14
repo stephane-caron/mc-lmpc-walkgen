@@ -286,12 +286,12 @@ class COMTube(object):
         print "compute_dual_hrep(): %.1f ms" % (1000. * (time.time() - t0))
         return (B, c)
 
-    def draw_dual_cones(self, scale=0.1):
+    def draw_dual_cones(self, apex, scale):
         handles = []
         for stance_id in self._vertices.keys():
-            apex = self.compute_polytope_center(stance_id)
+            # apex = self.compute_polytope_center(stance_id)
             cone_vertices = self.compute_dual_vrep(stance_id)
-            vscale = [apex + scale * array(v) for v in cone_vertices]
+            vscale = [scale * array(v) for v in cone_vertices]
             handles.extend(draw_3d_cone(
                 # recall that cone_vertices[0] is [0, 0, +g]
                 apex=apex, axis=[0, 0, 1], section=vscale[1:],

@@ -18,9 +18,8 @@
 # You should have received a copy of the GNU General Public License along with
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
-import pymanoid
-
 from cwc import compute_cwc_pyparma
+from pymanoid import ContactSet
 
 try:
     from hrp4_pymanoid import HRP4 as RobotModel
@@ -28,7 +27,7 @@ except ImportError:
     from pymanoid.robots import JVRC1 as RobotModel
 
 
-class Stance(pymanoid.ContactSet):
+class Stance(ContactSet):
 
     def __init__(self, state, left_foot=None, right_foot=None):
         contacts = {}
