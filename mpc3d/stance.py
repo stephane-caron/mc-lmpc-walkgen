@@ -36,13 +36,14 @@ class Stance(pymanoid.ContactSet):
             contacts['left_foot'] = left_foot
         if right_foot:
             contacts['right_foot'] = right_foot
-        foot = left_foot if state[-1] == 'L' else right_foot
-        self.com = foot.p + [0., 0., RobotModel.leg_length]
+        target_foot = left_foot if state[-1] == 'L' else right_foot
         self._cwc = None
         self._sep = None
-        self.state = state
+        self.com = target_foot.p + [0., 0., RobotModel.leg_length]
         self.left_foot = left_foot
         self.right_foot = right_foot
+        self.state = state
+        self.target_foot = target_foot
         super(Stance, self).__init__(contacts)
 
     @property

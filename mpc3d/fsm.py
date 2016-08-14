@@ -179,8 +179,8 @@ class StateMachine(object):
                 + self.ds_duration \
                 + 0.5 * self.ss_duration
             target_com = self.next_stance.com
-            delta_com = self.next_stance.com - self.cur_stance.com
-            target_comd = delta_com / (2 * self.ds_duration)
+            target_comd = (self.next_stance.com - self.cur_stance.com) / horizon
+            # target_comd = self.next_stance.comd
         elif self.cur_stance.is_double_support:
             horizon = self.rem_time + 0.5 * self.ss_duration
             target_com = self.cur_stance.com

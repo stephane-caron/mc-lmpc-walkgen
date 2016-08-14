@@ -298,8 +298,9 @@ class COMPreviewLoop(object):
             self.tube_handle = self.tube.draw_primal_polytopes()
         if True:
             print "\ncur_com =", repr(cur_com)
-            print "cur_comd =", repr(cur_comd)
             print "target_com =", repr(target_com)
+            print "|cur_comd| =", norm(cur_comd)
+            print "|target_comd| =", norm(target_comd)
             print "switch_time =", switch_time
             print "horizon =", horizon
             print "timestep = ", horizon / self.nb_mpc_steps
