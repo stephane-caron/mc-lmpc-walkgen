@@ -19,7 +19,7 @@
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
 from numpy import zeros
-from pymanoid import draw_line
+from pymanoid import draw_line, draw_point
 from threading import Lock
 
 
@@ -69,10 +69,10 @@ class PreviewBuffer(object):
         return self.preview_index == 0
 
     def on_tick(self, sim):
-        if self.preview_was_updated:
-            (comdd, rem_time) = self.get_next_preview_window()
+        if self.rem_time < sim.dt:
+            (self.comdd, self.rem_time) = self.get_next_preview_window()
         com0 = self.com.p
-        self.com.integrate_acceleration(comdd, sim.dt)
+        self.com.integrate_acceleration(self.comdd, sim.dt)
         if self.past_handles is not None:
             self.past_handles.append(
                 draw_line(com0, self.com.p, color='b', linewidth=3))
@@ -91,5 +91,7 @@ class PreviewBuffer(object):
             com = com + comd * dT + comdd * .5 * dT ** 2
             comd += comdd * dT
             color = 'b' if preview_index <= self.preview.switch_step else 'r'
+            self.preview_handles.append(
+                draw_point(com, color=color, pointsize=0.005))
             self.preview_handles.append(
                 draw_line(com0, com, color=color, linewidth=3))
