@@ -56,7 +56,7 @@ class Stance(pymanoid.ContactSet):
 
     @property
     def comd(self):
-        return 0.2 * self.target_foot.t
+        return 0.4 * self.target_foot.t
 
     @property
     def cwc(self):

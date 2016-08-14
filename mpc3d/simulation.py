@@ -20,7 +20,7 @@
 
 import time
 
-from threading import Lock, Thread
+from threading import Thread
 
 
 class Simulation(object):
@@ -34,10 +34,10 @@ class Simulation(object):
         - ``dt`` -- time interval between two ticks in simulation time
         """
         self.callbacks = []
+        self.extra_callbacks = []
         self.dt = dt
         self.is_running = False
         self.tick_time = 0
-        self.state_lock = Lock()
 
     def __del__(self):
         """Close thread at shutdown."""
@@ -46,6 +46,10 @@ class Simulation(object):
     def add_callback(self, callback):
         """Add a function called after each tick (insertion order matters)."""
         self.callbacks.append(callback)
+
+    def add_extra_callback(self, callback):
+        """Same as callbacks, but not part of the computation time budget."""
+        self.extra_callbacks.append(callback)
 
     def run_thread(self):
         """Run simulation thread."""
@@ -63,14 +67,17 @@ class Simulation(object):
         """Perform one simulation step."""
         for _ in xrange(n):
             t0 = time.time()
-            with self.state_lock:
-                for callback in self.callbacks:
-                    callback(self)
+            for callback in self.callbacks:
+                callback(self)
             rem_time = self.dt - (time.time() - t0)
+            if rem_time < -1e-4:
+                print "Time time exhausted by %.1f ms" % (-1000. * rem_time)
+            if self.extra_callbacks:
+                for callback in self.extra_callbacks:
+                    callback(self)
+                rem_time = self.dt - (time.time() - t0)
             if rem_time > 1e-4:
                 time.sleep(rem_time)
-            elif rem_time < -1e-4:
-                print "Time budget exhausted by %.1f ms" % (-1000. * rem_time)
             self.tick_time += 1
 
     def stop(self):

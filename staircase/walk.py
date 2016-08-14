@@ -136,31 +136,12 @@ def prepare_screenshot(scrot_time=38.175):
     while sim.time() < scrot_time:
         sim.sleep(1e-2)
     sim.stop()
-    # empty_gui_list(gui_handles['forces'])
-    # empty_gui_list(gui_handles['static'])
     mpc.target_box.hide()
     preview_buffer.com.set_visible(False)
     robot.set_transparency(0)
     viewer.SetBkgndColor([1, 1, 1])
     dash_graph_handles(fsm.left_foot_traj_handles)
     dash_graph_handles(fsm.right_foot_traj_handles)
-
-
-def update_sep():
-    """UPdate static-equilibrium polygons"""
-    if fsm.cur_stance.is_single_support:
-        ss_stance = fsm.cur_stance
-        ds_stance = fsm.next_stance
-    else:  # fsm.cur_stance.is_double_support:
-        ss_stance = fsm.next_stance
-        ds_stance = fsm.cur_stance
-    sep_height = preview_buffer.com.z - RobotModel.leg_length
-    gui_handles['static-ss'] = draw_polygon(
-        [(x[0], x[1], sep_height) for x in ss_stance.sep],
-        normal=[0, 0, 1], color='c')
-    gui_handles['static-ds'] = draw_polygon(
-        [(x[0], x[1], sep_height) for x in ds_stance.sep],
-        normal=[0, 0, 1], color='y')
 
 
 def update_robot_ik():
@@ -185,61 +166,55 @@ def update_robot_ik():
 
 def fsm_callback():
     """Function called after each FSM phase transition."""
-    update_sep()
     update_robot_ik()
 
 
-class PausableThread(threading.Thread):
+class ForceHandles(object):
 
     def __init__(self):
-        super(PausableThread, self).__init__()
-        self.daemon = True
-        self.lock = None
-
-    def pause(self):
-        self.lock.acquire()
-
-    def resume(self):
-        self.lock.release()
-
-    def stop(self):
-        self.lock = None
-
-    def start(self):
-        self.lock = threading.Lock()
-        super(PausableThread, self).start()
-
-    def run(self):
-        while self.lock:
-            with self.lock:
-                self.step()
-
-
-class ForcesThread(PausableThread):
-
-    def __init__(self):
-        super(ForcesThread, self).__init__(self)
         self.last_bkgnd_switch = None
+        self.handles = []
 
-    def step(self):
+    def on_tick(self, sim):
         """Find supporting contact forces at each COM acceleration update."""
-        sim.sync('forces')
         comdd = preview_buffer.comdd
         gravity = pymanoid.get_gravity()
         wrench = hstack([robot_mass * (comdd - gravity), zeros(3)])
         support = fsm.cur_stance.find_supporting_forces(
             wrench, preview_buffer.com.p, robot_mass, 10.)
         if not support:
-            gui_handles['forces'] = []
+            self.handles = []
             viewer.SetBkgndColor([.8, .4, .4])
             self.last_bkgnd_switch = time.time()
         else:
-            gui_handles['forces'] = [draw_force(c, fc) for (c, fc) in support]
+            self.handles = [draw_force(c, fc) for (c, fc) in support]
         if self.last_bkgnd_switch is not None \
                 and time.time() - self.last_bkgnd_switch > 0.2:
             # let's keep epilepsy at bay
             viewer.SetBkgndColor([.6, .6, .8])
             self.last_bkgnd_switch = None
+
+
+class SEPHandles(object):
+
+    def __init__(self):
+        self.ss_handles = None
+        self.ds_handles = None
+
+    def on_tick(self, sim):
+        if fsm.cur_stance.is_single_support:
+            ss_stance = fsm.cur_stance
+            ds_stance = fsm.next_stance
+        else:  # fsm.cur_stance.is_double_support:
+            ss_stance = fsm.next_stance
+            ds_stance = fsm.cur_stance
+        sep_height = preview_buffer.com.z - RobotModel.leg_length
+        self.ss_handles = draw_polygon(
+            [(x[0], x[1], sep_height) for x in ss_stance.sep],
+            normal=[0, 0, 1], color='c')
+        self.ds_handles = draw_polygon(
+            [(x[0], x[1], sep_height) for x in ds_stance.sep],
+            normal=[0, 0, 1], color='y')
 
 
 if __name__ == "__main__":
@@ -324,6 +299,11 @@ if __name__ == "__main__":
     sim.add_callback(preview_buffer.on_tick)
     sim.add_callback(mpc.on_tick)
     robot.start_ik_thread(dt)
+
+    sep = SEPHandles()
+    forces = ForceHandles()
+    sim.add_extra_callback(sep.on_tick)
+    sim.add_extra_callback(forces.on_tick)
 
     fsm_callback()  # show SE polygons at startup
 

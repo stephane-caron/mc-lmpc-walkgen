@@ -152,6 +152,8 @@ class COMTube(object):
                 else:  # self.start_stance.is_double_support
                     # we are in DS but polytope is included in the next SS-SEP
                     self._vertices = {0: vertices, 1: vertices}
+                print "compute_primal_vrep(): %.1f ms" % (
+                    1000. * (time.time() - t0))
                 return
             if self.start_stance.is_single_support:
                 mid_vertex = start_vertex + 0.95 * (mid_vertex - start_vertex)

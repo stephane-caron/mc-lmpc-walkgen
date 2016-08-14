@@ -30,7 +30,7 @@ class PreviewBuffer(object):
     execute them until the next update.
     """
 
-    def __init__(self, com, show_past=False, show_preview=True):
+    def __init__(self, com, show_past=True, show_preview=True):
         self.com = com
         self.preview_index = 0
         self.preview_lock = Lock()
