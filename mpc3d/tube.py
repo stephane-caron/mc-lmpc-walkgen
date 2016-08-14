@@ -90,6 +90,7 @@ class COMTube(object):
         """
         assert shape in COMTube.SHAPES
         self._cone_vertices = {}
+        self._hrep = None
         self._vertices = {}
         self.radius = radius
         self.safety_margin = safety_margin
@@ -182,12 +183,18 @@ class COMTube(object):
 
         A tuple (A, b) such that the H-representation is A * x <= b.
         """
+        if self._hrep is not None:
+            return self._hrep
         try:
-            if len(self._vertices) == 1:
-                return Polytope.hrep(self._vertices[0])
-            return Polytope.hrep(self._vertices[stance_id])
+            # this hrep can be calculated by hand rather than calling cdd
+            self._hrep = Polytope.hrep(self._vertices[stance_id])  # calls cdd
         except RuntimeError as e:
             raise TubeError("Could not compute primal hrep: %s" % str(e))
+        return self._hrep
+
+    def contains(self, com):
+        E, f = self.compute_primal_hrep(0)
+        return all(dot(E, com) <= f)
 
     def draw_primal_polytopes(self):
         """

@@ -56,6 +56,7 @@ class Simulation(object):
         """Start simulation thread. """
         self.is_running = True
         self.thread = Thread(target=self.run_thread, args=())
+        self.thread.daemon = True
         self.thread.start()
 
     def step(self, n=1):
