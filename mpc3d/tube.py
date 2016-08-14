@@ -19,6 +19,7 @@
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
 import pymanoid
+import time
 
 from numpy import array, cross, dot, float64, hstack, ones, sqrt, vstack, zeros
 from polygons import compute_polygon_hull, intersect_line_cylinder
@@ -109,6 +110,7 @@ class COMTube(object):
     """
 
     def compute_primal_vrep(self):
+        t0 = time.time()
         delta = self.target_com - self.start_com
         if dot(delta, delta) < 1e-6:
             self._vertices = {0: [self.start_com]}
@@ -164,6 +166,7 @@ class COMTube(object):
                 vertices1.append(mid_vertex)
                 vertices1.append(end_vertex)
         self._vertices = {0: vertices0, 1: vertices1}
+        print "compute_primal_vrep(): %.1f ms" % (1000. * (time.time() - t0))
 
     def compute_polytope_center(self, stance_id):
         V = array(self._vertices[stance_id])
@@ -185,11 +188,13 @@ class COMTube(object):
         """
         if self._hrep is not None:
             return self._hrep
+        t0 = time.time()
         try:
             # this hrep can be calculated by hand rather than calling cdd
             self._hrep = Polytope.hrep(self._vertices[stance_id])  # calls cdd
         except RuntimeError as e:
             raise TubeError("Could not compute primal hrep: %s" % str(e))
+        print "compute_primal_hrep(): %.1f ms" % (1000. * (time.time() - t0))
         return self._hrep
 
     def contains(self, com):
@@ -241,6 +246,7 @@ class COMTube(object):
         """
         if stance_id in self._cone_vertices:
             return self._cone_vertices[stance_id]
+        t0 = time.time()
         stance = self.start_stance if stance_id == 0 else self.target_stance
         A_O = stance.cwc  # CWC at world origin
         gravity = pymanoid.get_gravity()
@@ -256,6 +262,7 @@ class COMTube(object):
             self._cone_vertices[stance_id] = reduce_polar_system(B, c)
         except QhullError:
             raise TubeError("Could not reduce polar of stance %d" % stance_id)
+        print "compute_dual_vrep(): %.1f ms" % (1000. * (time.time() - t0))
         return self._cone_vertices[stance_id]
 
     def compute_dual_hrep(self, stance_id):
@@ -271,8 +278,10 @@ class COMTube(object):
         Matrix of the dual cone halfspace representation.
         """
         cone_vertices = self.compute_dual_vrep(stance_id)
+        t0 = time.time()
         B_new, c_new = Polytope.hrep(cone_vertices)
         B, c = (B_new.astype(float64), c_new.astype(float64))
+        print "compute_dual_hrep(): %.1f ms" % (1000. * (time.time() - t0))
         return (B, c)
 
     def draw_dual_cones(self, scale=0.1):
