@@ -52,14 +52,13 @@ class PreviewControl(object):
 
     The output control law will minimize, by decreasing priority:
 
-        1)  |p_{nb_steps} - p_goal|^2
-        1)  |pd_{nb_steps} - pd_goal|^2
+        1)  |x_{nb_steps} - x_goal|^2
         2)  sum_k |u_k|^2
 
     Note that this is a weighted (not prioritized) minimization.
     """
 
-    def __init__(self, A, B, C, d, E, f, x_init, x_goal, nb_steps):
+    def __init__(self, A, B, G, h, x_init, x_goal, nb_steps):
         """
         Instantiate a new controller.
 
@@ -67,34 +66,28 @@ class PreviewControl(object):
 
         - ``A`` -- state linear dynamics matrix
         - ``B`` -- control linear dynamics matrix
-        - ``C`` -- map from k to H-rep matrix of control constraints
-        - ``d`` -- map from k to H-rep vector of control constraints
-        - ``E`` -- map from k to H-rep matrix of state constraints
-        - ``f`` -- map from k to H-rep vector of state constraints
+        - ``G`` -- matrix for inequality constraints
+        - ``h`` -- vector for inequality constraints
         - ``x_init`` -- initial state
         - ``x_goal`` -- goal state
         - ``nb_steps`` -- number of discretized time steps
         """
-        u_dim = C(0).shape[1]
-        x_dim = x_init.shape[0]
+        u_dim = B.shape[1]
+        x_dim = A.shape[1]
         self.A = A
         self.B = B
-        self.C = C
-        self.E = E
-        self.G_state = None
+        self.G = G
         self.U_dim = u_dim * nb_steps
         self.X_dim = x_dim * nb_steps
-        self.d = d
-        self.f = f
-        self.h_state = None
+        self.h = h
         self.nb_steps = nb_steps
         self.phi_last = None
         self.psi_last = None
+        self.t0 = time.time()
         self.u_dim = u_dim
         self.x_dim = x_dim
         self.x_goal = x_goal
         self.x_init = x_init
-        self.t0 = time.time()
 
     def compute_dynamics(self):
         """
@@ -115,19 +108,16 @@ class PreviewControl(object):
             x_N = phi_last * x_0 + psi_last * U
 
         """
-        N = self.nb_steps
         phi = eye(self.x_dim)
         psi = zeros((self.x_dim, self.U_dim))
         # G, h = [], []  # list of matrices for inequalities G * x <= h
-        for k in xrange(N):
+        for k in xrange(self.nb_steps):
             # x_k = phi * x_init + psi * U
             # p_k = phi[:3] * x_init + psi[:3] * U
             # E * p_k <= f
             # (E * psi[:3]) * U <= f - (E * phi[:3]) * x_init
             # G.append(dot(self.E(k), psi[:3]))
             # h.append(self.f(k) - dot(dot(self.E(k), phi[:3]), self.x_init))
-
-            # Now we update phi and psi for iteration k + 1
             phi = dot(self.A, phi)
             psi = dot(self.A, psi)
             psi[:, self.u_dim * k:self.u_dim * (k + 1)] = self.B
@@ -151,24 +141,13 @@ class PreviewControl(object):
         q2 = -dot(b.T, A)
         w2 = 1000.
 
-        # Cost 3: |pd_N - pd_goal|^3 = |A[3:] x - b[3:]|^3
-        # P3 = dot(A[3:].T, A[3:])
-        # q3 = -dot(b[3:].T, A[3:])
-        # w3 = 1000.
-
         # Weighted combination of all costs
         P = w1 * P1 + w2 * P2
         q = w1 * q1 + w2 * q2
 
         # Inequality constraints
-        G_control = block_diag(*[self.C(k) for k in xrange(self.nb_steps)])
-        h_control = hstack([self.d(k) for k in xrange(self.nb_steps)])
-        # G = vstack([G_control, self.G_state])
-        # h = hstack([h_control, self.h_state])
-        G = G_control
-        h = h_control
-        # G = self.G_state
-        # h = self.h_state
+        G = self.G
+        h = self.h
 
         t0 = time.time()
         self.U = solve_qp(P, q, G, h)
@@ -188,6 +167,7 @@ class COMPreviewControl(PreviewControl):
 
     def __init__(self, com_init, comd_init, com_goal, comd_goal, tube,
                  duration, switch_time, nb_steps):
+        t0 = time.time()
         dT = duration / nb_steps
         I = eye(3)
         A = array(bmat([[I, dT * I], [zeros((3, 3)), I]]))
@@ -195,39 +175,29 @@ class COMPreviewControl(PreviewControl):
         x_init = hstack([com_init, comd_init])
         x_goal = hstack([com_goal, comd_goal])
         switch_step = int(switch_time / dT)
-        C, d, E, f = self.compute_inequalities(tube, switch_step, nb_steps)
-        super(COMPreviewControl, self).__init__(
-            A, B, C, d, E, f, x_init, x_goal, nb_steps)
-        self.duration = duration
-        self.switch_step = switch_step
-        self.timestep = dT
-
-    def compute_inequalities(self, tube, switch_step, nb_steps):
-        def multiplex_matrices(M1, M2, switch_step):
-            def M(k):
-                return M1 if k <= switch_step else M2
-            return M
-
-        def wrap_matrix(M1):
-            def M(k):
-                return M1
-            return M
-
+        G_list = []
+        h_list = []
+        # G_control = block_diag(*[self.C(k) for k in xrange(self.nb_steps)])
+        # h_control = hstack([self.d(k) for k in xrange(self.nb_steps)])
         C1, d1 = tube.dual_hrep[0]
         E1, f1 = tube.primal_hrep[0]
-        if switch_step >= nb_steps - 1:
-            C = wrap_matrix(C1)
-            d = wrap_matrix(d1)
-            E = wrap_matrix(E1)
-            f = wrap_matrix(f1)
-        else:
+        if 0 <= switch_step < nb_steps - 1:
             C2, d2 = tube.dual_hrep[1]
             E2, f2 = tube.primal_hrep[1]
-            C = multiplex_matrices(C1, C2, switch_step)
-            d = multiplex_matrices(d1, d2, switch_step)
-            E = multiplex_matrices(E1, E2, switch_step)
-            f = multiplex_matrices(f1, f2, switch_step)
-        return (C, d, E, f)
+        for k in xrange(nb_steps):
+            if k <= switch_step:
+                G_list.append(C1)
+                h_list.append(d1)
+            else:  # k > switch_step
+                G_list.append(C2)
+                h_list.append(d2)
+        G = block_diag(*G_list)
+        h = hstack(h_list)
+        super(COMPreviewControl, self).__init__(
+            A, B, G, h, x_init, x_goal, nb_steps)
+        self.switch_step = switch_step
+        self.timestep = dT
+        print "Pre comp: %.1f ms" % (1000. * (time.time() - t0))
 
 
 class TubePreviewControl(Process):
@@ -257,6 +227,7 @@ class TubePreviewControl(Process):
         self.tube_radius = tube_radius
 
     def on_tick(self, sim):
+        tA = time.time()
         cur_com = self.com.p
         cur_comd = self.com.pd
         cur_stance = self.fsm.cur_stance
@@ -264,19 +235,13 @@ class TubePreviewControl(Process):
         preview_targets = self.fsm.get_preview_targets()
         switch_time, horizon, target_com, target_comd = preview_targets
 
-        target_moved = norm(target_com - self.target_box.p) > 1e-3
-        phase_switched = self.fsm.phase_id > self.last_phase_id
+        # target_moved = norm(target_com - self.target_box.p) > 1e-3
+        # phase_switched = self.fsm.phase_id > self.last_phase_id
         self.target_box.set_pos(target_com)
+
         self.last_phase_id = self.fsm.phase_id
-        if True or not self.tube or target_moved or phase_switched or \
-                not self.tube.contains(cur_com):
-            print "Recomputing tube..."
-            t00 = time.time()
-            self.tube = COMTube(
-                cur_com, target_com, cur_stance, next_stance, self.tube_radius)
-            print "WTF? %.1f ms" % (1000. * (time.time() - t00))
-        else:
-            print "Keeping current tube"
+        self.tube = COMTube(
+            cur_com, target_com, cur_stance, next_stance, self.tube_radius)
         if True:
             print "\nVelocities:"
             print "- |cur_comd| =", norm(cur_comd)
@@ -286,6 +251,8 @@ class TubePreviewControl(Process):
             print "- switch_time =", switch_time
             print "- timestep = ", horizon / self.nb_mpc_steps
             print""
+        print "Here: %.1f ms" % (1000. * (time.time() - tA))
+        tA = time.time()
         try:
             preview_control = COMPreviewControl(
                 cur_com, cur_comd, target_com, target_comd, self.tube, horizon,
@@ -301,3 +268,5 @@ class TubePreviewControl(Process):
             warn("MPC: couldn't solve QP, maybe inconsistent constraints?")
             print "Exception:", e
             sim.stop()
+        print "Here: %.1f ms" % (1000. * (time.time() - tA))
+        tA = time.time()

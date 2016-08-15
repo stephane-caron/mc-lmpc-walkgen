@@ -93,10 +93,12 @@ class COMTube(object):
         self.target_com = target_com
 
         # all other computations depend on the primal V-rep:
+        t0 = time.time()
         self.compute_primal_vrep()
         self.compute_primal_hrep()
         self.compute_dual_vrep()
         self.compute_dual_hrep()
+        print "kron: %.1f ms" % (1000. * (time.time() - t0))
 
     """
     Primal polytopes

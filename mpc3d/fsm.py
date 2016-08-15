@@ -62,7 +62,6 @@ class StateMachine(Process):
         if init_com_offset is not None:
             first_stance.com += init_com_offset
         com.set_pos(first_stance.com)
-        self._next_stance = None
         self.callback = callback
         self.com = com
         self.contacts = contacts
@@ -75,11 +74,14 @@ class StateMachine(Process):
         self.is_not_over = True
         self.nb_contacts = len(contacts)
         self.next_contact_id = 2 if init_phase == 'DS-R' else 3  # kroooon
+        self.next_stance = None  # initialized below
         self.phase_id = -1  # 0 will be the first SS phase
         self.rem_time = 0.  # initial state is assumed at end of DS phase
         self.ss_duration = ss_duration
         self.thread = None
         self.thread_lock = None
+        #
+        self.next_stance = self.compute_next_stance()
 
     @property
     def next_contact(self):
@@ -89,11 +91,7 @@ class StateMachine(Process):
     def next_phase(self):
         return self.transitions[self.cur_phase]
 
-    @property
-    def next_stance(self):
-        if self._next_stance is not None:
-            # internal save to avoid useless CWC/SEP recomputations
-            return self._next_stance
+    def compute_next_stance(self):
         if self.next_phase == 'SS-L':
             left_foot = self.cur_stance.left_foot
             right_foot = None
@@ -108,8 +106,7 @@ class StateMachine(Process):
             right_foot = self.cur_stance.right_foot
         else:  # should not happen
             assert False, "Unknown state: %s" % self.next_phase
-        self._next_stance = Stance(self.next_phase, left_foot, right_foot)
-        return self._next_stance
+        return Stance(self.next_phase, left_foot, right_foot)
 
     def on_tick(self, sim):
         """
@@ -128,8 +125,9 @@ class StateMachine(Process):
                 progress = 1. - self.rem_time / self.cur_duration
                 self.free_foot.update_pose(progress)
             self.rem_time -= sim.dt
-        elif self.cur_stance.is_double_support and not can_switch_to_ss():
-            print "COM is not ready for next SS yet"
+        elif (self.cur_stance.is_double_support and
+              self.next_stance is not None and not can_switch_to_ss()):
+            print "\n\nCOM is not ready for next SS yet\n\n"
         else:
             self.step()
 
@@ -149,9 +147,9 @@ class StateMachine(Process):
                 self.free_foot.reset(self.cur_stance.left_foot.pose, next_pose)
             else:  # next_stance.right_foot is None
                 self.free_foot.reset(self.cur_stance.right_foot.pose, next_pose)
-        self._next_stance = None
         self.cur_phase = next_phase
         self.cur_stance = next_stance
+        self.next_stance = self.compute_next_stance()
         self.cur_duration = \
             self.ds_duration if self.cur_stance.is_double_support \
             else self.ss_duration
