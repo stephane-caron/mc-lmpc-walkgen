@@ -20,12 +20,12 @@
 
 import time
 
-from tube import COMTube, TubeError
-from numpy import array, bmat, dot, eye, hstack, sqrt, zeros
+from logging import warning
+from numpy import array, bmat, dot, eye, hstack, sqrt, vstack, zeros
 from pymanoid import PointMass, solve_qp
 from scipy.linalg import block_diag
 from simulation import Process
-from warnings import warn
+from tube import COMTube, TubeError
 
 
 def norm(v):
@@ -58,7 +58,7 @@ class PreviewControl(object):
     Note that this is a weighted (not prioritized) minimization.
     """
 
-    def __init__(self, A, B, G, h, x_init, x_goal, nb_steps):
+    def __init__(self, A, B, G, h, x_init, x_goal, nb_steps, E=None, f=None):
         """
         Instantiate a new controller.
 
@@ -232,15 +232,12 @@ class TubePreviewControl(Process):
             print "- switch_time =", switch_time
             print "- timestep = ", horizon / self.nb_mpc_steps
             print""
-        # target_moved = norm(target_com - self.target_box.p) > 1e-3
-        # phase_switched = self.fsm.phase_id > self.last_phase_id
         self.target_box.set_pos(target_com)
-        # self.last_phase_id = self.fsm.phase_id
         try:
             self.tube = COMTube(
                 cur_com, target_com, cur_stance, next_stance, self.tube_radius)
         except TubeError as e:
-            print "Tube error: %s" % str(e)
+            warning("Tube error: %s" % str(e))
             return
         preview_control = COMPreviewControl(
             cur_com, cur_comd, target_com, target_comd, self.tube, horizon,
@@ -250,9 +247,8 @@ class TubePreviewControl(Process):
             preview_control.compute_control()
             self.preview_buffer.update_preview(preview_control)
         except ValueError as e:
-            warn("MPC: couldn't solve QP, maybe inconsistent constraints?")
-            print "Exception:", e
-            sim.stop()
+            warning("MPC couldn't solve QP, constraints may be inconsistent")
+            return
         sim.report_comp_times({
             'tube_primal_vrep': self.tube.comp_times[0],
             'tube_primal_hrep': self.tube.comp_times[1],

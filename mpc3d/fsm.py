@@ -19,6 +19,7 @@
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
 from free_foot import FreeFoot
+from logging import info
 from simulation import Process
 from stance import Stance
 
@@ -127,7 +128,7 @@ class StateMachine(Process):
                 self.free_foot.update_pose(progress)
             self.rem_time -= sim.dt
         elif (self.cur_stance.is_double_support and not can_switch_to_ss()):
-            print "Not ready for single-support yet..."
+            info("Not ready for single-support yet...")
         else:
             self.step()
 
