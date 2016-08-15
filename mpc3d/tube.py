@@ -146,17 +146,95 @@ class COMTube(object):
             (-self.radius, -self.radius)]]
         tube_start = self.start_com - self.safety_margin * n
         tube_end = self.target_com + self.safety_margin * n
+        vertices = (
+            [tube_start + s for s in cross_section] +
+            [tube_end + s for s in cross_section])
+        self.full_vrep = vertices
         if self.start_stance.is_single_support:
-            if False \
-                    and all(abs(self.next_stance.com - self.target_com) < 1e-3):
-                # we are at the end of an SS phase
-                vertices = (
-                    [tube_start + s for s in cross_section] +
-                    [tube_end + s for s in cross_section])
+            if all(abs(self.start_stance.com - self.target_com) < 1e-3):
                 self.primal_vrep = [vertices]
-                print "compute_primal_vrep(): %.1f ms" % (
-                    1000. * (time.time() - t0))
-                return
+            else:  # beginning of SS phase
+                self.primal_vrep = [
+                    [self.start_com],  # single-support
+                    vertices]          # ensuing double-support
+        else:  # self.start_stance.is_double_support
+            self.primal_vrep = [
+                vertices,             # double-support
+                [self.target_com]]    # final single-support
+        print "compute_primal_vrep(): %.1f ms" % (1000. * (time.time() - t0))
+
+    def compute_primal_hrep(self):
+        t0 = time.time()
+        try:
+            self.full_hrep = (Polytope.hrep(self.full_vrep))
+        except RuntimeError as e:
+            raise TubeError("Could not compute primal hrep: %s" % str(e))
+        print "compute_primal_hrep(): %.1f ms" % (1000. * (time.time() - t0))
+
+    def compute_dual_vrep(self):
+        t0 = time.time()
+        gravity = pymanoid.get_gravity()
+
+        def compute(stance_id, vertices):
+            stance = self.start_stance if stance_id == 0 else self.next_stance
+            A_O = stance.cwc
+            B_list, c_list = [], []
+            for (i, v) in enumerate(vertices):
+                B = A_O[:, :3] + cross(A_O[:, 3:], v)
+                c = dot(B, gravity)
+                B_list.append(B)
+                c_list.append(c)
+            B = vstack(B_list)
+            c = hstack(c_list)
+            try:
+                return reduce_polar_system(B, c)
+            except QhullError:
+                raise TubeError("Cannot reduce polar of stance %d" % stance_id)
+
+        if len(self.primal_vrep) == 1:
+            vertices = compute(0, self.primal_vrep[0])
+            self.dual_vrep = [polar_to_polytope(vertices)]
+        else:  # len(self.primal_vrep) == 2
+            ss_id, ds_id = (1, 0) if len(self.primal_vrep[0]) > 1 else (0, 1)
+            ds_vertices = compute(ds_id, self.full_vrep)
+            ss_vertices = compute(ss_id, self.primal_vrep[ss_id])
+            ss_vertices = polygon_intersect(ds_vertices, ss_vertices)
+            self.dual_vrep = [
+                polar_to_polytope(ss_vertices),
+                polar_to_polytope(ds_vertices)]
+            if ss_id == 1:
+                self.dual_vrep.reverse()
+
+        print "compute_dual_vrep(): %.1f ms" % (1000. * (time.time() - t0))
+
+    def compute_dual_hrep(self):
+        t0 = time.time()
+        for (stance_id, cone_vertices) in enumerate(self.dual_vrep):
+            # cone_vertices = self.compute_dual_vrep(stance_id)
+            B, c = Polytope.hrep(cone_vertices)
+            # B, c = (B.astype(float64), c.astype(float64))  # if using pyparma
+            self.dual_hrep.append((B, c))
+        print "compute_dual_hrep(): %.1f ms" % (1000. * (time.time() - t0))
+
+
+class DoubleCOMTube(COMTube):
+
+    def compute_primal_vrep(self):
+        t0 = time.time()
+        delta = self.target_com - self.start_com
+        n = normalize(delta)
+        t = array([0., 0., 1.])
+        t -= dot(t, n) * n
+        t = normalize(t)
+        b = cross(n, t)
+        cross_section = [dx * t + dy * b for (dx, dy) in [
+            (+self.radius, +self.radius),
+            (+self.radius, -self.radius),
+            (-self.radius, +self.radius),
+            (-self.radius, -self.radius)]]
+        tube_start = self.start_com - self.safety_margin * n
+        tube_end = self.target_com + self.safety_margin * n
+        if self.start_stance.is_single_support:
             sep = self.start_stance.sep
         else:  # self.start_stance.is_double_support
             sep = self.next_stance.sep
@@ -222,21 +300,9 @@ class COMTube(object):
             B = vstack(B_list)
             c = hstack(c_list)
             try:
-                cone_vertices = reduce_polar_system(B, c)
+                vertices2d = reduce_polar_system(B, c)
+                cone_vertices = polar_to_polytope(vertices2d)
                 self.dual_vrep.append(cone_vertices)
             except QhullError:
                 raise TubeError("Cannot reduce polar of stance %d" % stance_id)
         print "compute_dual_vrep(): %.1f ms" % (1000. * (time.time() - t0))
-
-    def compute_dual_hrep(self):
-        t0 = time.time()
-        for (stance_id, cone_vertices) in enumerate(self.dual_vrep):
-            # cone_vertices = self.compute_dual_vrep(stance_id)
-            B_new, c_new = Polytope.hrep(cone_vertices)
-            B, c = (B_new.astype(float64), c_new.astype(float64))
-            self.dual_hrep.append((B, c))
-        print "compute_dual_hrep(): %.1f ms" % (1000. * (time.time() - t0))
-
-    def contains(self, com):
-        E, f = self.primal_hrep[0]
-        return all(dot(E, com) <= f)
