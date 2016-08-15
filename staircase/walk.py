@@ -19,7 +19,8 @@
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
 import IPython
-import os.path
+import os
+import re
 import sys
 import time
 import threading
@@ -56,8 +57,8 @@ except ImportError:
 
 # Settings
 dt = 3e-2           # [s] simulation time step
-ds_duration = 1.0   # [s] duration of double-support phases
-ss_duration = 0.5   # [s] duration of single-support phases
+ds_duration = 0.5   # [s] duration of double-support phases
+ss_duration = 0.7   # [s] duration of single-support phases
 tube_radius = 0.03  # [m]
 
 
@@ -230,6 +231,21 @@ class PreviewDrawer(Process):
                 draw_line(com_free0, com_free, color='g', linewidth=3))
 
 
+class ScreenshotTaker(Process):
+
+    def __init__(self):
+        print "Please click on the OpenRAVE window."
+        line = os.popen('/usr/bin/xwininfo | grep "Window id:"').readlines()[0]
+        window_id = "0x%s" % re.search('0x([0-9a-f]+)', line).group(1)
+        self.frame_index = 0
+        self.window_id = window_id
+
+    def on_tick(self, sim):
+        fname = './recording/camera/%05d.png' % (self.frame_index)
+        os.system('import -window %s %s' % (self.window_id, fname))
+        self.frame_index += 1
+
+
 class SEPDrawer(Process):
 
     def __init__(self):
@@ -381,7 +397,7 @@ if __name__ == "__main__":
             },
             weights={
                 'com': 10.,
-                'contact': 1000.,
+                'contact': 10000.,
                 'link_pose': 100.,
                 'posture': 1.,
             })
@@ -418,6 +434,7 @@ if __name__ == "__main__":
     left_foot_traj_drawer = TrajectoryDrawer(robot.left_foot, 'g.')
     preview_drawer = PreviewDrawer()
     right_foot_traj_drawer = TrajectoryDrawer(robot.right_foot, 'r.')
+    screenshots = ScreenshotTaker()
     sep_drawer = SEPDrawer()
     tube_drawer = TubeDrawer()
     sim.schedule_extra(com_traj_drawer)
@@ -425,6 +442,7 @@ if __name__ == "__main__":
     sim.schedule_extra(left_foot_traj_drawer)
     sim.schedule_extra(preview_drawer)
     sim.schedule_extra(right_foot_traj_drawer)
+    sim.schedule_extra(screenshots)
     sim.schedule_extra(sep_drawer)
     sim.schedule_extra(tube_drawer)
 
