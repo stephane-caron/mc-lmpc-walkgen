@@ -227,7 +227,6 @@ class TubePreviewControl(Process):
         self.tube_radius = tube_radius
 
     def on_tick(self, sim):
-        tA = time.time()
         cur_com = self.com.p
         cur_comd = self.com.pd
         cur_stance = self.fsm.cur_stance
@@ -251,8 +250,6 @@ class TubePreviewControl(Process):
             print "- switch_time =", switch_time
             print "- timestep = ", horizon / self.nb_mpc_steps
             print""
-        print "Here: %.1f ms" % (1000. * (time.time() - tA))
-        tA = time.time()
         try:
             preview_control = COMPreviewControl(
                 cur_com, cur_comd, target_com, target_comd, self.tube, horizon,
@@ -268,5 +265,3 @@ class TubePreviewControl(Process):
             warn("MPC: couldn't solve QP, maybe inconsistent constraints?")
             print "Exception:", e
             sim.stop()
-        print "Here: %.1f ms" % (1000. * (time.time() - tA))
-        tA = time.time()
