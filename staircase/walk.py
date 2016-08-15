@@ -425,7 +425,7 @@ if __name__ == "__main__":
     preview_drawer = PreviewDrawer()
     right_foot_traj_drawer = TrajectoryDrawer(robot.right_foot, 'r-')
     screenshots = None
-    screenshots = ScreenshotTaker()
+    # screenshots = ScreenshotTaker()  # comment this to disable recording
     sep_drawer = SEPDrawer()
     tube_drawer = TubeDrawer()
     sim.schedule_extra(com_traj_drawer)
@@ -438,10 +438,8 @@ if __name__ == "__main__":
     sim.schedule_extra(sep_drawer)
     sim.schedule_extra(tube_drawer)
 
-    # update_robot_ik()
-
     set_camera_1()
-    if False:
+    if True:
         print """
 
 Multi-contact WPG based on Model Preview Control of 3D COM Accelerations
@@ -449,23 +447,25 @@ Multi-contact WPG based on Model Preview Control of 3D COM Accelerations
 
 Ready to go! You can control the simulation by:
 
-    sim.start()     sim.pause()
-    sim.stop()      sim.resume()
+    sim.start() -- run/resume simulation in a separate thread
+    sim.step(100) -- run simulation in current thread for 100 steps
+    sim.stop() -- stop/pause simulation
 
 You can access all state variables via this IPython shell.
 Here is the list of global objects. Use <TAB> to see what's inside.
 
-    preview_buffer -- stores MPC output and feeds it to the IK
     fsm -- finite state machine
     mpc -- model-preview controller
+    preview_buffer -- stores MPC output and feeds it to the IK
     robot -- kinematic model of the robot (includes IK solver)
 
 For example:
 
-    preview_buffer.comdd -- desired COM acceleration
     fsm.cur_stance -- current stance (contacts + target COM)
-    mpc.hide_cone() -- hide drawing of preview COM acceleration cone
+    mpc.tube -- latest trajectory tube computed for preview control
+    preview_buffer.comdd -- desired COM acceleration
     robot.com -- robot COM position from kinematic model
+    sim.print_comp_times() -- print averaged internal computation times
 
 Enjoy :)
 
