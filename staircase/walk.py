@@ -26,7 +26,11 @@ import time
 import threading
 
 try:
-    from pymanoid import init
+    from pymanoid import init, draw_line, draw_points, get_gravity, get_viewer
+    from pymanoid import draw_force, draw_polygon, Contact, PointMass
+    from pymanoid.tasks import ContactTask, DOFTask, LinkPoseTask, MinCAMTask
+    from pymanoid import set_camera_top, draw_point
+    from pymanoid.draw import draw_3d_cone, draw_polyhedron
 except ImportError:
     script_path = os.path.realpath(__file__)
     sys.path.append(os.path.dirname(script_path) + '/../pymanoid')
@@ -37,7 +41,10 @@ except ImportError:
     from pymanoid.draw import draw_3d_cone, draw_polyhedron
 
 try:
-    from mpc3d.buffer import PreviewBuffer  # whatever
+    from mpc3d.buffer import PreviewBuffer
+    from mpc3d.control import TubePreviewControl
+    from mpc3d.fsm import StateMachine
+    from mpc3d.simulation import Process, Simulation
 except ImportError:
     script_path = os.path.realpath(__file__)
     sys.path.append(os.path.dirname(script_path) + '/..')
