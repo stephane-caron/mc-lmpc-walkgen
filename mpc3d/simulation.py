@@ -20,6 +20,7 @@
 
 import time
 
+from stats import AvgStdEstimator
 from threading import Thread
 
 
@@ -32,7 +33,7 @@ class Process(object):
 
 class Simulation(object):
 
-    def __init__(self, dt, profile=False):
+    def __init__(self, dt):
         """
         Create a new simulation object.
 
@@ -41,11 +42,11 @@ class Simulation(object):
         - ``dt`` -- time interval between two ticks in simulation time
         - ``profile`` -- when True, reports computation times for each Process
         """
+        self.comp_times = {}
         self.dt = dt
         self.extras = []
         self.is_running = False
         self.processes = []
-        self.profile = profile
         self.tick_time = 0
 
     def __del__(self):
@@ -77,12 +78,7 @@ class Simulation(object):
         for _ in xrange(n):
             t0 = time.time()
             for process in self.processes:
-                if self.profile:
-                    tp0 = time.time()
                 process.on_tick(self)
-                if self.profile:
-                    time_ms = 1000. * (time.time() - tp0)
-                    print "%s:\t%.1f ms" % (process.__class__.__name__, time_ms)
             rem_time = self.dt - (time.time() - t0)
             if rem_time < -1e-4:
                 print "Time time exhausted by %.1f ms" % (-1000. * rem_time)
@@ -96,3 +92,22 @@ class Simulation(object):
 
     def stop(self):
         self.is_running = False
+
+    def report_comp_times(self, d):
+        for (key, value) in d.iteritems():
+            if key not in self.comp_times:
+                self.comp_times[key] = AvgStdEstimator()
+            self.comp_times[key].add(value)
+
+    def print_comp_times(self):
+        total_avg, total_std = 0., 0.
+        for (key, estimator) in self.comp_times.iteritems():
+            avg, std, n = estimator.get_all()
+            avg *= 1000  # [ms]
+            std *= 1000  # [ms]
+            print "%20s: %.1f ms +/- %.1f ms over %5d items" % (
+                key, avg, std, n)
+            total_avg += avg
+            total_std += std
+        print "%20s  ----------------------------------" % ''
+        print "%20s: %.1f ms +/- %.1f ms" % ("total", total_avg, total_std)

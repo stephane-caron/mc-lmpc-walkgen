@@ -423,7 +423,7 @@ if __name__ == "__main__":
             robot.ik.add_task(
                 DOFTask(robot, robot.ROT_P, 0., gain=0.9, weight=0.5))
 
-    sim = Simulation(dt=dt, profile=True)
+    sim = Simulation(dt=dt)
     sim.schedule(fsm)
     sim.schedule(preview_buffer)
     sim.schedule(mpc)
@@ -434,6 +434,7 @@ if __name__ == "__main__":
     left_foot_traj_drawer = TrajectoryDrawer(robot.left_foot, 'g.')
     preview_drawer = PreviewDrawer()
     right_foot_traj_drawer = TrajectoryDrawer(robot.right_foot, 'r.')
+    screenshots = None
     screenshots = ScreenshotTaker()
     sep_drawer = SEPDrawer()
     tube_drawer = TubeDrawer()
@@ -442,7 +443,8 @@ if __name__ == "__main__":
     sim.schedule_extra(left_foot_traj_drawer)
     sim.schedule_extra(preview_drawer)
     sim.schedule_extra(right_foot_traj_drawer)
-    sim.schedule_extra(screenshots)
+    if screenshots:
+        sim.schedule_extra(screenshots)
     sim.schedule_extra(sep_drawer)
     sim.schedule_extra(tube_drawer)
 

@@ -126,13 +126,26 @@ class COMTube(object):
         self.start_stance = start_stance
         self.target_com = target_com
         #
+        self.comp_times = []
+        t0 = time.time()
         self.compute_primal_vrep()
+        t1 = time.time()
+        self.comp_times.append(t1 - t0)
+        t0 = t1
         self.compute_primal_hrep()
+        t1 = time.time()
+        self.comp_times.append(t1 - t0)
+        t0 = t1
         self.compute_dual_vrep()
+        t1 = time.time()
+        self.comp_times.append(t1 - t0)
+        t0 = t1
         self.compute_dual_hrep()
+        t1 = time.time()
+        self.comp_times.append(t1 - t0)
 
     def compute_primal_vrep(self):
-        t0 = time.time()
+        # t0 = time.time()
         delta = self.target_com - self.start_com
         n = normalize(delta)
         t = array([0., 0., 1.])
@@ -161,18 +174,18 @@ class COMTube(object):
             self.primal_vrep = [
                 vertices,             # double-support
                 [self.target_com]]    # final single-support
-        print "compute_primal_vrep(): %.1f ms" % (1000. * (time.time() - t0))
+        # print "compute_primal_vrep(): %.1f ms" % (1000. * (time.time() - t0))
 
     def compute_primal_hrep(self):
-        t0 = time.time()
+        # t0 = time.time()
         try:
             self.full_hrep = (Polytope.hrep(self.full_vrep))
         except RuntimeError as e:
             raise TubeError("Could not compute primal hrep: %s" % str(e))
-        print "compute_primal_hrep(): %.1f ms" % (1000. * (time.time() - t0))
+        # print "compute_primal_hrep(): %.1f ms" % (1000. * (time.time() - t0))
 
     def compute_dual_vrep(self):
-        t0 = time.time()
+        # t0 = time.time()
         gravity = pymanoid.get_gravity()
 
         def compute(stance_id, vertices):
@@ -205,22 +218,22 @@ class COMTube(object):
             if ss_id == 1:
                 self.dual_vrep.reverse()
 
-        print "compute_dual_vrep(): %.1f ms" % (1000. * (time.time() - t0))
+        # print "compute_dual_vrep(): %.1f ms" % (1000. * (time.time() - t0))
 
     def compute_dual_hrep(self):
-        t0 = time.time()
+        # t0 = time.time()
         for (stance_id, cone_vertices) in enumerate(self.dual_vrep):
             # cone_vertices = self.compute_dual_vrep(stance_id)
             B, c = Polytope.hrep(cone_vertices)
             # B, c = (B.astype(float64), c.astype(float64))  # if using pyparma
             self.dual_hrep.append((B, c))
-        print "compute_dual_hrep(): %.1f ms" % (1000. * (time.time() - t0))
+        # print "compute_dual_hrep(): %.1f ms" % (1000. * (time.time() - t0))
 
 
 class DoubleCOMTube(COMTube):
 
     def compute_primal_vrep(self):
-        t0 = time.time()
+        # t0 = time.time()
         delta = self.target_com - self.start_com
         n = normalize(delta)
         t = array([0., 0., 1.])
@@ -256,8 +269,8 @@ class DoubleCOMTube(COMTube):
                 else:  # self.start_stance.is_double_support
                     # we are in DS but polytope is included in the next SS-SEP
                     self.primal_vrep = [vertices, vertices]
-                print "compute_primal_vrep(): %.1f ms" % (
-                    1000. * (time.time() - t0))
+                # print "compute_primal_vrep(): %.1f ms" % ( 1000. *
+                # (time.time() - t0))
                 return
             if self.start_stance.is_single_support:
                 mid_vertex = start_vertex + 0.95 * (mid_vertex - start_vertex)
@@ -272,19 +285,19 @@ class DoubleCOMTube(COMTube):
                 vertices1.append(mid_vertex)
                 vertices1.append(end_vertex)
         self.primal_vrep = [vertices0, vertices1]
-        print "compute_primal_vrep(): %.1f ms" % (1000. * (time.time() - t0))
+        # print "compute_primal_vrep(): %.1f ms" % (1000. * (time.time() - t0))
 
     def compute_primal_hrep(self):
-        t0 = time.time()
+        # t0 = time.time()
         for (stance_id, vertices) in enumerate(self.primal_vrep):
             try:
                 self.primal_hrep.append(Polytope.hrep(vertices))
             except RuntimeError as e:
                 raise TubeError("Could not compute primal hrep: %s" % str(e))
-        print "compute_primal_hrep(): %.1f ms" % (1000. * (time.time() - t0))
+        # print "compute_primal_hrep(): %.1f ms" % (1000. * (time.time() - t0))
 
     def compute_dual_vrep(self):
-        t0 = time.time()
+        # t0 = time.time()
         gravity = pymanoid.get_gravity()
         for (stance_id, vertices) in enumerate(self.primal_vrep):
             if stance_id == 0:
@@ -305,4 +318,4 @@ class DoubleCOMTube(COMTube):
                 self.dual_vrep.append(cone_vertices)
             except QhullError:
                 raise TubeError("Cannot reduce polar of stance %d" % stance_id)
-        print "compute_dual_vrep(): %.1f ms" % (1000. * (time.time() - t0))
+        # print "compute_dual_vrep(): %.1f ms" % (1000. * (time.time() - t0))

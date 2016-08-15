@@ -83,7 +83,6 @@ class PreviewControl(object):
         self.nb_steps = nb_steps
         self.phi_last = None
         self.psi_last = None
-        self.t0 = time.time()
         self.u_dim = u_dim
         self.x_dim = x_dim
         self.x_goal = x_goal
@@ -149,25 +148,17 @@ class PreviewControl(object):
         G = self.G
         h = self.h
 
-        t0 = time.time()
+        t1 = time.time()
         self.U = solve_qp(P, q, G, h)
-        print "Solved QP in %.2f ms" % (1000. * (time.time() - t0))
-        print "Total QP time: %.2f ms" % (1000. * (time.time() - self.t0))
-        # print "End error (position):", norm(
-        #     dot(self.phi_last[:3], self.x_init) +
-        #     dot(self.psi_last[:3], self.U) -
-        #     self.x_goal[:3])
-        # print "End error (velocity):", norm(
-        #     dot(self.phi_last[3:], self.x_init) +
-        #     dot(self.psi_last[3:], self.U) -
-        #     self.x_goal[3:])
+        self.comp_times = [t1 - self.t0, time.time() - t1]
+        # print "Solved QP in %.2f ms" % (1000. * (time.time() - t1))
 
 
 class COMPreviewControl(PreviewControl):
 
     def __init__(self, com_init, comd_init, com_goal, comd_goal, tube,
                  duration, switch_time, nb_steps):
-        t0 = time.time()
+        self.t0 = time.time()
         dT = duration / nb_steps
         I = eye(3)
         A = array(bmat([[I, dT * I], [zeros((3, 3)), I]]))
@@ -196,7 +187,6 @@ class COMPreviewControl(PreviewControl):
             A, B, G, h, x_init, x_goal, nb_steps)
         self.switch_step = switch_step
         self.timestep = dT
-        print "Pre comp: %.1f ms" % (1000. * (time.time() - t0))
 
 
 class TubePreviewControl(Process):
@@ -232,7 +222,7 @@ class TubePreviewControl(Process):
         next_stance = self.fsm.next_stance
         preview_targets = self.fsm.get_preview_targets()
         switch_time, horizon, target_com, target_comd = preview_targets
-        if True:
+        if False:
             print "\nVelocities:"
             print "- |cur_comd| =", norm(cur_comd)
             print "- |target_comd| =", norm(target_comd)
@@ -262,3 +252,11 @@ class TubePreviewControl(Process):
             warn("MPC: couldn't solve QP, maybe inconsistent constraints?")
             print "Exception:", e
             sim.stop()
+        sim.report_comp_times({
+            'tube_primal_vrep': self.tube.comp_times[0],
+            'tube_primal_hrep': self.tube.comp_times[1],
+            'tube_dual_vrep': self.tube.comp_times[2],
+            'tube_dual_hrep': self.tube.comp_times[3],
+            'qp_build': preview_control.comp_times[0],
+            'qp_solve': preview_control.comp_times[1]
+        })
