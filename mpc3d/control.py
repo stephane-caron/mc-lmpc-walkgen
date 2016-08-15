@@ -180,10 +180,9 @@ class COMPreviewControl(PreviewControl):
         # G_control = block_diag(*[self.C(k) for k in xrange(self.nb_steps)])
         # h_control = hstack([self.d(k) for k in xrange(self.nb_steps)])
         C1, d1 = tube.dual_hrep[0]
-        E1, f1 = tube.primal_hrep[0]
+        E, f = tube.full_hrep
         if 0 <= switch_step < nb_steps - 1:
             C2, d2 = tube.dual_hrep[1]
-            E2, f2 = tube.primal_hrep[1]
         for k in xrange(nb_steps):
             if k <= switch_step:
                 G_list.append(C1)

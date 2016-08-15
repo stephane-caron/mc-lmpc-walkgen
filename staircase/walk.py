@@ -305,19 +305,27 @@ class TubeDrawer(Process):
             colors.reverse()
         for (i, vertices) in enumerate(tube.primal_vrep):
             color = colors[i]
-            self.poly_handles.extend(
-                draw_polyhedron(vertices, '*.-#', color=color))
+            if len(vertices) == 1:
+                self.poly_handles.append(
+                    draw_point(vertices[0], color=color, pointsize=0.01))
+            else:
+                self.poly_handles.extend(
+                    draw_polyhedron(vertices, '*.-#', color=color))
 
     def draw_dual(self, tube):
         self.cone_handles = []
         scale = 0.05
         apex = [0., 0., scale * 9.81]
+        colors = [(0.5, 0.5, 0., 0.3), (0., 0.5, 0.5, 0.3)]
+        if tube.start_stance.is_single_support:
+            colors.reverse()
         for (stance_id, cone_vertices) in enumerate(tube.dual_vrep):
+            color = colors[stance_id]
             vscale = [scale * array(v) for v in cone_vertices]
             self.cone_handles.extend(draw_3d_cone(
                 # recall that cone_vertices[0] is [0, 0, +g]
                 apex=apex, axis=[0, 0, 1], section=vscale[1:],
-                combined='r-#'))
+                combined='r-#', color=color))
 
 
 def set_camera_cones():
