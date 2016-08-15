@@ -29,47 +29,36 @@ except ImportError:
 
 class Stance(ContactSet):
 
-    def __init__(self, state, left_foot=None, right_foot=None):
+    def __init__(self, phase, left_foot=None, right_foot=None,
+                 ref_velocity=0.4):
+        """
+        Create a new stance.
+
+        INPUT:
+
+        - ``phase`` -- corresponding phase in the FSM
+        - ``left_foot`` -- (optional) left foot contact
+        - ``right_foot`` -- (optional) right foot contact
+        - ``ref_velocity`` -- (default: 0.4 m/s) target forward COM velocity
+        """
         contacts = {}
         if left_foot:
             contacts['left_foot'] = left_foot
         if right_foot:
             contacts['right_foot'] = right_foot
-        target_foot = left_foot if state[-1] == 'L' else right_foot
-        self._cwc = None
-        self._sep = None
+        target_foot = left_foot if phase[-1] == 'L' else right_foot
         self.com = target_foot.p + [0., 0., RobotModel.leg_length]
+        self.comd = ref_velocity * target_foot.t
+        self.is_double_support = phase.startswith('DS')
+        self.is_single_support = phase.startswith('SS')
         self.left_foot = left_foot
         self.right_foot = right_foot
-        self.state = state
-        self.target_foot = target_foot
+        self.phase = phase
         super(Stance, self).__init__(contacts)
+        self.compute_stability_criteria()
 
-    @property
-    def is_double_support(self):
-        return self.state.startswith('DS')
-
-    @property
-    def is_single_support(self):
-        return self.state.startswith('SS')
-
-    @property
-    def comd(self):
-        return 0.4 * self.target_foot.t
-
-    @property
-    def cwc(self):
-        """Contact Wrench Cone at world origin"""
-        if self._cwc is None:
-            self._cwc = self.compute_wrench_cone([0, 0, 0])  # cdd
-        elif self._cwc is None:
-            self._cwc = compute_cwc_pyparma(self, [0, 0, 0])
-        return self._cwc
-
-    @property
-    def sep(self):
-        """Static-equilibrium polygon as list of vertices"""
-        if self._sep is None:
-            m = RobotModel.mass  # however, the SEP does not depend on this
-            self._sep = self.compute_static_equilibrium_area(m)
-        return self._sep
+    def compute_stability_criteria(self):
+        self.cwc = self.compute_wrench_cone([0, 0, 0])  # calls cdd
+        # self.cwc = compute_cwc_pyparma(self, [0, 0, 0])
+        m = RobotModel.mass  # however, the SEP does not depend on this
+        self.sep = self.compute_static_equilibrium_area(m)

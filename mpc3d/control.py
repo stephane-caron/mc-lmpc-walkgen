@@ -118,28 +118,26 @@ class PreviewControl(object):
         N = self.nb_steps
         phi = eye(self.x_dim)
         psi = zeros((self.x_dim, self.U_dim))
-        G, h = [], []  # list of matrices for inequalities G * x <= h
+        # G, h = [], []  # list of matrices for inequalities G * x <= h
         for k in xrange(N):
             # x_k = phi * x_init + psi * U
             # p_k = phi[:3] * x_init + psi[:3] * U
             # E * p_k <= f
             # (E * psi[:3]) * U <= f - (E * phi[:3]) * x_init
-            G.append(dot(self.E(k), psi[:3]))
-            h.append(self.f(k) - dot(dot(self.E(k), phi[:3]), self.x_init))
+            # G.append(dot(self.E(k), psi[:3]))
+            # h.append(self.f(k) - dot(dot(self.E(k), phi[:3]), self.x_init))
 
             # Now we update phi and psi for iteration k + 1
             phi = dot(self.A, phi)
             psi = dot(self.A, psi)
             psi[:, self.u_dim * k:self.u_dim * (k + 1)] = self.B
-        self.G_state = vstack(G)
-        self.h_state = hstack(h)
+        # self.G_state = vstack(G)
+        # self.h_state = hstack(h)
         self.phi_last = phi
         self.psi_last = psi
 
     def compute_control(self):
-        if self.psi_last is None:
-            self.compute_dynamics()
-
+        assert self.psi_last is not None, "Call compute_dynamics() first"
         A = self.psi_last
         b = self.x_goal - dot(self.phi_last, self.x_init)
 
@@ -148,25 +146,25 @@ class PreviewControl(object):
         q1 = zeros(self.U_dim)
         w1 = 1.
 
-        # Cost 2: |p_N - p_goal|^2 = |A[:3] x - b[:3]|^2
-        P2 = dot(A[:3].T, A[:3])
-        q2 = -dot(b[:3].T, A[:3])
+        # Cost 2: |x_N - x_goal|^2 = |A * x - b|^2
+        P2 = dot(A.T, A)
+        q2 = -dot(b.T, A)
         w2 = 1000.
 
         # Cost 3: |pd_N - pd_goal|^3 = |A[3:] x - b[3:]|^3
-        P3 = dot(A[3:].T, A[3:])
-        q3 = -dot(b[3:].T, A[3:])
-        w3 = 1000.
+        # P3 = dot(A[3:].T, A[3:])
+        # q3 = -dot(b[3:].T, A[3:])
+        # w3 = 1000.
 
         # Weighted combination of all costs
-        P = w1 * P1 + w2 * P2 + w3 * P3
-        q = w1 * q1 + w2 * q2 + w3 * q3
+        P = w1 * P1 + w2 * P2
+        q = w1 * q1 + w2 * q2
 
         # Inequality constraints
         G_control = block_diag(*[self.C(k) for k in xrange(self.nb_steps)])
         h_control = hstack([self.d(k) for k in xrange(self.nb_steps)])
-        G = vstack([G_control, self.G_state])
-        h = hstack([h_control, self.h_state])
+        # G = vstack([G_control, self.G_state])
+        # h = hstack([h_control, self.h_state])
         G = G_control
         h = h_control
         # G = self.G_state
@@ -215,16 +213,16 @@ class COMPreviewControl(PreviewControl):
                 return M1
             return M
 
-        C1, d1 = tube.compute_dual_hrep(stance_id=0)
-        E1, f1 = tube.compute_primal_hrep(stance_id=0)
+        C1, d1 = tube.dual_hrep[0]
+        E1, f1 = tube.primal_hrep[0]
         if switch_step >= nb_steps - 1:
             C = wrap_matrix(C1)
             d = wrap_matrix(d1)
             E = wrap_matrix(E1)
             f = wrap_matrix(f1)
         else:
-            C2, d2 = tube.compute_dual_hrep(stance_id=1)
-            E2, f2 = tube.compute_primal_hrep(stance_id=1)
+            C2, d2 = tube.dual_hrep[1]
+            E2, f2 = tube.primal_hrep[1]
             C = multiplex_matrices(C1, C2, switch_step)
             d = multiplex_matrices(d1, d2, switch_step)
             E = multiplex_matrices(E1, E2, switch_step)
@@ -234,8 +232,7 @@ class COMPreviewControl(PreviewControl):
 
 class TubePreviewControl(Process):
 
-    def __init__(self, com, fsm, preview_buffer, nb_mpc_steps, tube_shape,
-                 tube_radius):
+    def __init__(self, com, fsm, preview_buffer, nb_mpc_steps, tube_radius):
         """
         Create a new feedback controller that continuously runs the preview
         controller and sends outputs to a COMAccelBuffer.
@@ -246,7 +243,6 @@ class TubePreviewControl(Process):
         - ``fsm`` -- instance of finite state machine
         - ``preview_buffer`` -- PreviewBuffer to send MPC outputs to
         - ``nb_mpc_steps`` -- discretization step of the preview window
-        - ``tube_shape`` -- number of vertices of the COM trajectory tube
         - ``tube_radius`` -- tube radius (in L1 norm)
         """
         self.com = com
@@ -259,7 +255,6 @@ class TubePreviewControl(Process):
         self.thread_lock = None
         self.tube = None
         self.tube_radius = tube_radius
-        self.tube_shape = tube_shape
 
     def on_tick(self, sim):
         cur_com = self.com.p
@@ -276,9 +271,10 @@ class TubePreviewControl(Process):
         if True or not self.tube or target_moved or phase_switched or \
                 not self.tube.contains(cur_com):
             print "Recomputing tube..."
+            t00 = time.time()
             self.tube = COMTube(
-                cur_com, target_com, cur_stance, next_stance, self.tube_shape,
-                self.tube_radius)
+                cur_com, target_com, cur_stance, next_stance, self.tube_radius)
+            print "WTF? %.1f ms" % (1000. * (time.time() - t00))
         else:
             print "Keeping current tube"
         if True:
