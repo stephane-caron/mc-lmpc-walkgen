@@ -81,7 +81,7 @@ class Simulation(object):
                 process.on_tick(self)
             rem_time = self.dt - (time.time() - t0)
             if rem_time < -1e-4:
-                print "Time time exhausted by %.1f ms" % (-1000. * rem_time)
+                print "Time budget exhausted by %.1f ms" % (-1000. * rem_time)
             if self.extras:
                 for process in self.extras:
                     process.on_tick(self)

@@ -19,7 +19,9 @@
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
 # from cwc import compute_cwc_pyparma
+from numpy import dot
 from pymanoid import ContactSet
+from pymanoid.polyhedra import Polytope
 
 try:
     from hrp4_pymanoid import HRP4 as RobotModel
@@ -62,3 +64,12 @@ class Stance(ContactSet):
         # self.cwc = compute_cwc_pyparma(self, [0, 0, 0])
         m = RobotModel.mass  # however, the SEP does not depend on this
         self.sep = self.compute_static_equilibrium_area(m)
+        self.sep_hrep = Polytope.hrep(self.sep)
+
+    def dist_to_sep_edge(self, com):
+        """
+        Algebraic distance to the edge of the static-equilibrium polygon
+        (positive inside, negative outside).
+        """
+        A, b = self.sep_hrep
+        return min(b - dot(A, com[:2]))

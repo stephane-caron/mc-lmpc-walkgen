@@ -58,8 +58,9 @@ except ImportError:
 # Settings
 dt = 3e-2           # [s] simulation time step
 ds_duration = 0.5   # [s] duration of double-support phases
-ss_duration = 0.7   # [s] duration of single-support phases
-tube_radius = 0.03  # [m]
+nb_mpc_steps = 10   # discretization step of MPC controller
+ss_duration = 1.0   # [s] duration of single-support phases
+tube_radius = 0.03  # [m] radius in L1 norm
 
 
 # Global variables
@@ -132,21 +133,6 @@ def set_camera_1():
         [0., 0.,  0., 1.]])
 
 
-def prepare_screenshot(scrot_time=38.175):
-    set_camera_1()
-    if not sim.is_started:
-        sim.start()
-    while sim.time() < scrot_time:
-        sim.sleep(1e-2)
-    sim.stop()
-    mpc.target_box.hide()
-    preview_buffer.com.set_visible(False)
-    robot.set_transparency(0)
-    viewer.SetBkgndColor([1, 1, 1])
-    dash_graph_handles(fsm.left_foot_traj_handles)
-    dash_graph_handles(fsm.right_foot_traj_handles)
-
-
 def update_robot_ik():
     with robot_lock:
         robot.ik.remove_task(robot.left_foot.name)
@@ -165,11 +151,6 @@ def update_robot_ik():
                 robot, robot.right_foot, fsm.free_foot)
         robot.ik.add_task(left_foot_task)
         robot.ik.add_task(right_foot_task)
-
-
-def fsm_callback():
-    """Function called after each FSM phase transition."""
-    update_robot_ik()
 
 
 class ForceDrawer(Process):
@@ -371,16 +352,16 @@ if __name__ == "__main__":
         staircase,
         com,
         'DS-R',
-        ss_duration=ss_duration,
-        ds_duration=ds_duration,
+        ss_duration,
+        ds_duration,
         init_com_offset=array([0.05, 0., 0.]),
         cyclic=True,
-        callback=fsm_callback)
+        callback=update_robot_ik)
     mpc = TubePreviewControl(
         com,
         fsm,
         preview_buffer,
-        nb_mpc_steps=10,
+        nb_mpc_steps=nb_mpc_steps,
         tube_radius=tube_radius)
 
     with robot_lock:
@@ -435,7 +416,7 @@ if __name__ == "__main__":
     preview_drawer = PreviewDrawer()
     right_foot_traj_drawer = TrajectoryDrawer(robot.right_foot, 'r.')
     screenshots = None
-    screenshots = ScreenshotTaker()
+    # screenshots = ScreenshotTaker()
     sep_drawer = SEPDrawer()
     tube_drawer = TubeDrawer()
     sim.schedule_extra(com_traj_drawer)
@@ -448,7 +429,7 @@ if __name__ == "__main__":
     sim.schedule_extra(sep_drawer)
     sim.schedule_extra(tube_drawer)
 
-    fsm_callback()  # show SE polygons at startup
+    # update_robot_ik()
 
     set_camera_1()
     if False:

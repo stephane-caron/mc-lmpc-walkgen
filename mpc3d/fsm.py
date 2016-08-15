@@ -18,7 +18,6 @@
 # You should have received a copy of the GNU General Public License along with
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
-
 from free_foot import FreeFoot
 from simulation import Process
 from stance import Stance
@@ -117,17 +116,18 @@ class StateMachine(Process):
         - ``sim`` -- instance of current simulation
         """
         def can_switch_to_ss():
-            m, next_stance = 39., self.next_stance
-            return next_stance.is_inside_static_equ_polygon(self.com.p, m)
+            dist_to_edge = self.next_stance.dist_to_sep_edge(self.com.p)
+            if dist_to_edge < 0.01:
+                return False
+            return True
 
         if self.rem_time > 0.:
             if self.cur_stance.is_single_support:
                 progress = 1. - self.rem_time / self.cur_duration
                 self.free_foot.update_pose(progress)
             self.rem_time -= sim.dt
-        elif (self.cur_stance.is_double_support and
-              self.next_stance is not None and not can_switch_to_ss()):
-            print "\n\nCOM is not ready for next SS yet\n\n"
+        elif (self.cur_stance.is_double_support and not can_switch_to_ss()):
+            print "Not ready for single-support yet..."
         else:
             self.step()
 

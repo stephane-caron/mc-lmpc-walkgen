@@ -214,6 +214,7 @@ class TubePreviewControl(Process):
         self.thread_lock = None
         self.tube = None
         self.tube_radius = tube_radius
+        self.verbose = False
 
     def on_tick(self, sim):
         cur_com = self.com.p
@@ -222,7 +223,7 @@ class TubePreviewControl(Process):
         next_stance = self.fsm.next_stance
         preview_targets = self.fsm.get_preview_targets()
         switch_time, horizon, target_com, target_comd = preview_targets
-        if False:
+        if self.verbose:
             print "\nVelocities:"
             print "- |cur_comd| =", norm(cur_comd)
             print "- |target_comd| =", norm(target_comd)

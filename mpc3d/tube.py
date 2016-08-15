@@ -97,7 +97,7 @@ def polar_to_polytope(vertices2d):
 class COMTube(object):
 
     def __init__(self, start_com, target_com, start_stance, next_stance, radius,
-                 safety_margin=0.02):
+                 margin=0.01):
         """
         Create a new COM trajectory tube.
 
@@ -107,13 +107,8 @@ class COMTube(object):
         - ``target_com`` -- end position of the COM
         - ``start_stance`` -- stance used to compute the contact wrench cone
         - ``radius`` -- side of the cross-section square (for ``shape`` > 2)
-        - ``safety_margin`` -- safety margin (in [m]) around start and end COM
-                               positions (default: 0.02)
-
-        .. NOTE::
-
-            We are assuming that self.start_stance applies to all vertices of
-            the tube. See the paper for a discussion of this technical choice.
+        - ``margin`` -- safety margin (in [m]) before/after start/end COM
+                        positions (default: 1 [cm])
         """
         self.dual_hrep = []
         self.dual_vrep = []
@@ -121,7 +116,7 @@ class COMTube(object):
         self.primal_hrep = []
         self.primal_vrep = []
         self.radius = radius
-        self.safety_margin = safety_margin
+        self.margin = margin
         self.start_com = start_com
         self.start_stance = start_stance
         self.target_com = target_com
@@ -157,8 +152,8 @@ class COMTube(object):
             (+self.radius, -self.radius),
             (-self.radius, +self.radius),
             (-self.radius, -self.radius)]]
-        tube_start = self.start_com - self.safety_margin * n
-        tube_end = self.target_com + self.safety_margin * n
+        tube_start = self.start_com - self.margin * n
+        tube_end = self.target_com + self.margin * n
         vertices = (
             [tube_start + s for s in cross_section] +
             [tube_end + s for s in cross_section])
@@ -245,8 +240,8 @@ class DoubleCOMTube(COMTube):
             (+self.radius, -self.radius),
             (-self.radius, +self.radius),
             (-self.radius, -self.radius)]]
-        tube_start = self.start_com - self.safety_margin * n
-        tube_end = self.target_com + self.safety_margin * n
+        tube_start = self.start_com - self.margin * n
+        tube_end = self.target_com + self.margin * n
         if self.start_stance.is_single_support:
             sep = self.start_stance.sep
         else:  # self.start_stance.is_double_support
