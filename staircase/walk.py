@@ -279,6 +279,7 @@ class TubeDrawer(Process):
         self.comdd_handle = []
         self.cone_handles = []
         self.poly_handles = []
+        self.tz = 1.1
 
     def on_tick(self, sim):
         scale = 0.05
@@ -290,10 +291,11 @@ class TubeDrawer(Process):
             self.draw_dual(mpc.tube)
         except Exception as e:
             print "Drawing of dual cones failed: %s" % str(e)
-        comdd = scale * preview_buffer.comdd
+        tz = self.tz
+        comdd = scale * preview_buffer.comdd + [0., 0., tz]
         self.comdd_handle = [
-            draw_line([0, 0, 0], comdd, color='r', linewidth=3),
-            draw_points([[0, 0, 0], comdd], color='r', pointsize=0.005)]
+            draw_line([0, 0, tz], comdd, color='r', linewidth=3),
+            draw_points([[0, 0, tz], comdd], color='r', pointsize=0.005)]
 
     def draw_primal(self, tube):
         self.poly_handles = []
@@ -311,14 +313,14 @@ class TubeDrawer(Process):
 
     def draw_dual(self, tube):
         self.cone_handles = []
-        scale = 0.05
-        apex = [0., 0., scale * 9.81]
+        scale, tz = 0.05, self.tz
+        apex = [0., 0., scale * 9.81 + tz]
         colors = [(0.5, 0.5, 0., 0.3), (0., 0.5, 0.5, 0.3)]
         if tube.start_stance.is_single_support:
             colors.reverse()
         for (stance_id, cone_vertices) in enumerate(tube.dual_vrep):
             color = colors[stance_id]
-            vscale = [scale * array(v) for v in cone_vertices]
+            vscale = [scale * array(v) + [0., 0., tz] for v in cone_vertices]
             self.cone_handles.extend(draw_3d_cone(
                 # recall that cone_vertices[0] is [0, 0, +g]
                 apex=apex, axis=[0, 0, 1], section=vscale[1:],
@@ -412,11 +414,11 @@ if __name__ == "__main__":
 
     com_traj_drawer = TrajectoryDrawer(com, 'b-')
     forces_drawer = ForceDrawer()
-    left_foot_traj_drawer = TrajectoryDrawer(robot.left_foot, 'g.')
+    left_foot_traj_drawer = TrajectoryDrawer(robot.left_foot, 'g-')
     preview_drawer = PreviewDrawer()
-    right_foot_traj_drawer = TrajectoryDrawer(robot.right_foot, 'r.')
+    right_foot_traj_drawer = TrajectoryDrawer(robot.right_foot, 'r-')
     screenshots = None
-    # screenshots = ScreenshotTaker()
+    screenshots = ScreenshotTaker()
     sep_drawer = SEPDrawer()
     tube_drawer = TubeDrawer()
     sim.schedule_extra(com_traj_drawer)
