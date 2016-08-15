@@ -66,19 +66,23 @@ class PreviewControl(object):
 
         - ``A`` -- state linear dynamics matrix
         - ``B`` -- control linear dynamics matrix
-        - ``G`` -- matrix for inequality constraints
-        - ``h`` -- vector for inequality constraints
+        - ``G`` -- matrix for control inequality constraints
+        - ``h`` -- vector for control inequality constraints
         - ``x_init`` -- initial state
         - ``x_goal`` -- goal state
         - ``nb_steps`` -- number of discretized time steps
+        - ``E`` -- (optional) matrix for state inequality constraints
+        - ``f`` -- (optional) vector for state inequality constraints
         """
         u_dim = B.shape[1]
         x_dim = A.shape[1]
         self.A = A
         self.B = B
+        self.E = E
         self.G = G
         self.U_dim = u_dim * nb_steps
         self.X_dim = x_dim * nb_steps
+        self.f = f
         self.h = h
         self.nb_steps = nb_steps
         self.phi_last = None
@@ -109,26 +113,25 @@ class PreviewControl(object):
         """
         phi = eye(self.x_dim)
         psi = zeros((self.x_dim, self.U_dim))
-        # G, h = [], []  # list of matrices for inequalities G * x <= h
+        G_list, h_list = [], []
         for k in xrange(self.nb_steps):
             # x_k = phi * x_init + psi * U
             # p_k = phi[:3] * x_init + psi[:3] * U
             # E * p_k <= f
             # (E * psi[:3]) * U <= f - (E * phi[:3]) * x_init
-            # G.append(dot(self.E(k), psi[:3]))
-            # h.append(self.f(k) - dot(dot(self.E(k), phi[:3]), self.x_init))
+            if self.E is not None:
+                G_list.append(dot(self.E, psi[:3]))
+                h_list.append(self.f - dot(dot(self.E, phi[:3]), self.x_init))
             phi = dot(self.A, phi)
             psi = dot(self.A, psi)
             psi[:, self.u_dim * k:self.u_dim * (k + 1)] = self.B
-        # self.G_state = vstack(G)
-        # self.h_state = hstack(h)
+        self.G_state = G_list
+        self.h_state = h_list
         self.phi_last = phi
         self.psi_last = psi
 
     def compute_control(self):
         assert self.psi_last is not None, "Call compute_dynamics() first"
-        A = self.psi_last
-        b = self.x_goal - dot(self.phi_last, self.x_init)
 
         # Cost 1: sum_k u_k^2
         P1 = eye(self.U_dim)
@@ -136,6 +139,8 @@ class PreviewControl(object):
         w1 = 1.
 
         # Cost 2: |x_N - x_goal|^2 = |A * x - b|^2
+        A = self.psi_last
+        b = self.x_goal - dot(self.phi_last, self.x_init)
         P2 = dot(A.T, A)
         q2 = -dot(b.T, A)
         w2 = 1000.
@@ -145,19 +150,20 @@ class PreviewControl(object):
         q = w1 * q1 + w2 * q2
 
         # Inequality constraints
-        G = self.G
-        h = self.h
-
         t1 = time.time()
-        self.U = solve_qp(P, q, G, h)
+        if self.E is not None:
+            G = vstack([self.G] + self.G_state)
+            h = hstack([self.h] + self.h_state)
+            self.U = solve_qp(P, q, G, h)
+        else:
+            self.U = solve_qp(P, q, self.G, self.h)
         self.comp_times = [t1 - self.t0, time.time() - t1]
-        # print "Solved QP in %.2f ms" % (1000. * (time.time() - t1))
 
 
 class COMPreviewControl(PreviewControl):
 
     def __init__(self, com_init, comd_init, com_goal, comd_goal, tube,
-                 duration, switch_time, nb_steps):
+                 duration, switch_time, nb_steps, state_constraints=False):
         self.t0 = time.time()
         dT = duration / nb_steps
         I = eye(3)
@@ -168,10 +174,10 @@ class COMPreviewControl(PreviewControl):
         switch_step = int(switch_time / dT)
         G_list = []
         h_list = []
-        # G_control = block_diag(*[self.C(k) for k in xrange(self.nb_steps)])
-        # h_control = hstack([self.d(k) for k in xrange(self.nb_steps)])
         C1, d1 = tube.dual_hrep[0]
-        E, f = tube.full_hrep
+        E, f = None, None
+        if state_constraints:
+            E, f = tube.full_hrep
         if 0 <= switch_step < nb_steps - 1:
             C2, d2 = tube.dual_hrep[1]
         for k in xrange(nb_steps):
@@ -184,7 +190,7 @@ class COMPreviewControl(PreviewControl):
         G = block_diag(*G_list)
         h = hstack(h_list)
         super(COMPreviewControl, self).__init__(
-            A, B, G, h, x_init, x_goal, nb_steps)
+            A, B, G, h, x_init, x_goal, nb_steps, E, f)
         self.switch_step = switch_step
         self.timestep = dT
 
