@@ -21,9 +21,8 @@
 import pymanoid
 import time
 
-from numpy import array, cross, dot, float64, hstack, ones, sqrt, vstack, zeros
+from numpy import array, cross, dot, float64, hstack, ones, sqrt, vstack
 from polygons import compute_polygon_hull, intersect_line_cylinder
-from pymanoid.draw import draw_3d_cone, draw_line, draw_point, draw_polyhedron
 from pymanoid.polyhedra import Polytope
 from scipy.spatial.qhull import QhullError
 
@@ -170,26 +169,7 @@ class COMTube(object):
         self._vertices = {0: vertices0, 1: vertices1}
         print "compute_primal_vrep(): %.1f ms" % (1000. * (time.time() - t0))
 
-    def compute_polytope_center(self, stance_id):
-        V = array(self._vertices[stance_id])
-        n = len(self._vertices[stance_id])
-        return V.sum(axis=0) / n
-
-    def compute_primal_hrep(self, stance_id):
-        """
-        Compute the primal representation of the tube, i.e. the H-representation
-        of its Euclidean polytope.
-
-        INPUT:
-
-        - ``stance_id`` -- 0 for start stance_id, 1 for end stance_id
-
-        OUTPUT:
-
-        A tuple (A, b) such that the H-representation is A * x <= b.
-        """
-        if self._hrep is not None:
-            return self._hrep
+    def compute_primal_hrep(self):
         t0 = time.time()
         try:
             # this hrep can be calculated by hand rather than calling cdd
@@ -197,57 +177,8 @@ class COMTube(object):
         except RuntimeError as e:
             raise TubeError("Could not compute primal hrep: %s" % str(e))
         print "compute_primal_hrep(): %.1f ms" % (1000. * (time.time() - t0))
-        return self._hrep
 
-    def contains(self, com):
-        E, f = self.compute_primal_hrep(0)
-        return all(dot(E, com) <= f)
-
-    def draw_primal_polytopes(self):
-        """
-        Draw polytopes for each stance.
-
-        OUTPUT:
-
-        GUI handles.
-        """
-        handles = []
-        colors = [(0.5, 0.5, 0., 0.3), (0., 0.5, 0.5, 0.3)]
-        if self.start_stance.is_single_support:
-            colors.reverse()
-        for (stance_id, vlist) in self._vertices.iteritems():
-            if len(vlist) == 1:
-                handles.append(draw_point(
-                    vlist[0], color=[0., 0.5, 0.5], pointsize=0.025))
-            elif len(vlist) == 2:
-                handles.append(draw_line(
-                    vlist[0], vlist[1], color=[0., 0.5, 0.5], linewidth=5))
-            else:  # should be a full polytope
-                color = colors[stance_id]
-                handles.extend(draw_polyhedron(vlist, '*.-#', color=color))
-        return handles
-
-    """
-    Dual cone
-    =========
-    """
-
-    def compute_dual_vrep(self, stance_id):
-        """
-        Compute vertices of dual COM acceleration cones.
-
-        INPUT:
-
-        - ``stance_id`` -- 0 for start stance_id, 1 for end stance_id
-
-        OUTPUT:
-
-        Dual cone in vertex representation. The first vertex is the apex [0, 0,
-        +g], while the following ones give the polygon of the cross section at
-        zdd = -g.
-        """
-        if stance_id in self._cone_vertices:
-            return self._cone_vertices[stance_id]
+    def compute_dual_vrep(self):
         t0 = time.time()
         stance = self.start_stance if stance_id == 0 else self.target_stance
         A_O = stance.cwc  # CWC at world origin
@@ -286,14 +217,6 @@ class COMTube(object):
         print "compute_dual_hrep(): %.1f ms" % (1000. * (time.time() - t0))
         return (B, c)
 
-    def draw_dual_cones(self, apex, scale):
-        handles = []
-        for stance_id in self._vertices.keys():
-            # apex = self.compute_polytope_center(stance_id)
-            cone_vertices = self.compute_dual_vrep(stance_id)
-            vscale = [scale * array(v) for v in cone_vertices]
-            handles.extend(draw_3d_cone(
-                # recall that cone_vertices[0] is [0, 0, +g]
-                apex=apex, axis=[0, 0, 1], section=vscale[1:],
-                combined='r-#'))
-        return handles
+    def contains(self, com):
+        E, f = self.primal_hrep[0]
+        return all(dot(E, com) <= f)

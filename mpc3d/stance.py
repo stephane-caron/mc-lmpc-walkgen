@@ -18,7 +18,7 @@
 # You should have received a copy of the GNU General Public License along with
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
-from cwc import compute_cwc_pyparma
+# from cwc import compute_cwc_pyparma
 from pymanoid import ContactSet
 
 try:

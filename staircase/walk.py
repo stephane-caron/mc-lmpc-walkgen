@@ -32,7 +32,8 @@ except ImportError:
     from pymanoid import init, draw_line, draw_points, get_gravity, get_viewer
     from pymanoid import draw_force, draw_polygon, Contact, PointMass
     from pymanoid.tasks import ContactTask, DOFTask, LinkPoseTask, MinCAMTask
-    from pymanoid import set_camera_top
+    from pymanoid import set_camera_top, draw_point
+    from pymanoid.draw import draw_3d_cone, draw_polyhedron
 
 try:
     from mpc3d.buffer import PreviewBuffer  # whatever
@@ -196,6 +197,39 @@ class ForceDrawer(Process):
             self.last_bkgnd_switch = None
 
 
+class PreviewDrawer(Process):
+
+    def __init__(self):
+        self.handles = []
+
+    def on_tick(self, sim):
+        com_pre, comd_pre = com.p, com.pd
+        com_free, comd_free = com.p, com.pd
+        dT = preview_buffer.preview.timestep
+        self.handles = []
+        self.handles.append(
+            draw_point(com.p, color='m', pointsize=0.007))
+        for preview_index in xrange(len(preview_buffer.preview.U) / 3):
+            com_pre0 = com_pre
+            j = 3 * preview_index
+            comdd = preview_buffer.preview.U[j:j + 3]
+            com_pre = com_pre + comd_pre * dT + comdd * .5 * dT ** 2
+            comd_pre += comdd * dT
+            color = \
+                'b' if preview_index <= preview_buffer.preview.switch_step \
+                else 'r'
+            self.handles.append(
+                draw_point(com_pre, color=color, pointsize=0.005))
+            self.handles.append(
+                draw_line(com_pre0, com_pre, color=color, linewidth=3))
+            com_free0 = com_free
+            com_free = com_free + comd_free * dT
+            self.handles.append(
+                draw_point(com_free, color='g', pointsize=0.005))
+            self.handles.append(
+                draw_line(com_free0, com_free, color='g', linewidth=3))
+
+
 class SEPDrawer(Process):
 
     def __init__(self):
@@ -218,6 +252,30 @@ class SEPDrawer(Process):
             normal=[0, 0, 1], color='y')
 
 
+class TrajectoryDrawer(Process):
+
+    def __init__(self, body, combined='b-', color=None, linewidth=3,
+                 linestyle=None):
+        color = color if color is not None else combined[0]
+        linestyle = linestyle if linestyle is not None else combined[1]
+        assert linestyle in ['-', '.']
+        self.body = body
+        self.color = color
+        self.handles = []
+        self.last_pos = body.p
+        self.linestyle = linestyle
+        self.linewidth = linewidth
+        self.parity = True
+
+    def on_tick(self, sim):
+        if self.linestyle == '-' or self.parity:
+            self.handles.append(draw_line(
+                self.last_pos, self.body.p, color=self.color,
+                linewidth=self.linewidth))
+        self.last_pos = self.body.p
+        self.parity = not self.parity
+
+
 class TubeDrawer(Process):
 
     def __init__(self):
@@ -228,18 +286,38 @@ class TubeDrawer(Process):
     def on_tick(self, sim):
         scale = 0.05
         try:
-            self.poly_handles = mpc.tube.draw_primal_polytopes()
+            self.draw_primal(mpc.tube)
         except Exception as e:
             print "Drawing of polytopes failed: %s" % str(e)
         try:
-            self.cone_handles = mpc.tube.draw_dual_cones(
-                apex=[0., 0., scale * 9.81], scale=scale)
+            self.draw_dual(mpc.tube)
         except Exception as e:
             print "Drawing of dual cones failed: %s" % str(e)
         comdd = scale * preview_buffer.comdd
         self.comdd_handle = [
             draw_line([0, 0, 0], comdd, color='r', linewidth=3),
             draw_points([[0, 0, 0], comdd], color='r', pointsize=0.005)]
+
+    def draw_primal(self, tube):
+        self.poly_handles = []
+        colors = [(0.5, 0.5, 0., 0.3), (0., 0.5, 0.5, 0.3)]
+        if tube.start_stance.is_single_support:
+            colors.reverse()
+        for (i, vertices) in enumerate(tube.primal_vrep):
+            color = colors[i]
+            self.poly_handles.extend(
+                draw_polyhedron(vertices, '*.-#', color=color))
+
+    def draw_dual(self, tube):
+        self.cone_handles = []
+        scale = 0.05
+        apex = [0., 0., scale * 9.81]
+        for (stance_id, cone_vertices) in enumerate(tube.dual_vrep):
+            vscale = [scale * array(v) for v in cone_vertices]
+            self.cone_handles.extend(draw_3d_cone(
+                # recall that cone_vertices[0] is [0, 0, +g]
+                apex=apex, axis=[0, 0, 1], section=vscale[1:],
+                combined='r-#'))
 
 
 def set_camera_cones():
@@ -279,7 +357,6 @@ if __name__ == "__main__":
         fsm,
         preview_buffer,
         nb_mpc_steps=10,
-        tube_shape=8,
         tube_radius=tube_radius)
 
     with robot_lock:
@@ -328,12 +405,20 @@ if __name__ == "__main__":
     sim.schedule(mpc)
     robot.start_ik_thread(dt)
 
-    forces = ForceDrawer()
-    sep = SEPDrawer()
-    tube = TubeDrawer()
-    sim.schedule_extra(forces)
-    sim.schedule_extra(sep)
-    sim.schedule_extra(tube)
+    com_traj_drawer = TrajectoryDrawer(com, 'b-')
+    forces_drawer = ForceDrawer()
+    left_foot_traj_drawer = TrajectoryDrawer(robot.left_foot, 'g.')
+    preview_drawer = PreviewDrawer()
+    right_foot_traj_drawer = TrajectoryDrawer(robot.right_foot, 'r.')
+    sep_drawer = SEPDrawer()
+    tube_drawer = TubeDrawer()
+    sim.schedule_extra(com_traj_drawer)
+    sim.schedule_extra(forces_drawer)
+    sim.schedule_extra(left_foot_traj_drawer)
+    sim.schedule_extra(preview_drawer)
+    sim.schedule_extra(right_foot_traj_drawer)
+    sim.schedule_extra(sep_drawer)
+    sim.schedule_extra(tube_drawer)
 
     fsm_callback()  # show SE polygons at startup
 

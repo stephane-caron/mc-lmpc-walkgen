@@ -21,7 +21,7 @@
 import time
 
 from tube import COMTube, TubeError
-from numpy import array, bmat, dot, eye, hstack, sqrt, vstack, zeros
+from numpy import array, bmat, dot, eye, hstack, sqrt, zeros
 from pymanoid import PointMass, solve_qp
 from scipy.linalg import block_diag
 from simulation import Process
@@ -94,6 +94,7 @@ class PreviewControl(object):
         self.x_dim = x_dim
         self.x_goal = x_goal
         self.x_init = x_init
+        self.t0 = time.time()
 
     def compute_dynamics(self):
         """
@@ -174,14 +175,15 @@ class PreviewControl(object):
         t0 = time.time()
         self.U = solve_qp(P, q, G, h)
         print "Solved QP in %.2f ms" % (1000. * (time.time() - t0))
-        print "End error (position):", norm(
-            dot(self.phi_last[:3], self.x_init) +
-            dot(self.psi_last[:3], self.U) -
-            self.x_goal[:3])
-        print "End error (velocity):", norm(
-            dot(self.phi_last[3:], self.x_init) +
-            dot(self.psi_last[3:], self.U) -
-            self.x_goal[3:])
+        print "Total QP time: %.2f ms" % (1000. * (time.time() - self.t0))
+        # print "End error (position):", norm(
+        #     dot(self.phi_last[:3], self.x_init) +
+        #     dot(self.psi_last[:3], self.U) -
+        #     self.x_goal[:3])
+        # print "End error (velocity):", norm(
+        #     dot(self.phi_last[3:], self.x_init) +
+        #     dot(self.psi_last[3:], self.U) -
+        #     self.x_goal[3:])
 
 
 class COMPreviewControl(PreviewControl):

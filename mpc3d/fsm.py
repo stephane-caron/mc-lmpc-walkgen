@@ -20,7 +20,6 @@
 
 
 from free_foot import FreeFoot
-from pymanoid import draw_line
 from simulation import Process
 from stance import Stance
 
@@ -74,12 +73,10 @@ class StateMachine(Process):
         self.ds_duration = ds_duration
         self.free_foot = FreeFoot(visible=False, color='c')
         self.is_not_over = True
-        self.left_foot_traj_handles = []
         self.nb_contacts = len(contacts)
         self.next_contact_id = 2 if init_phase == 'DS-R' else 3  # kroooon
         self.phase_id = -1  # 0 will be the first SS phase
         self.rem_time = 0.  # initial state is assumed at end of DS phase
-        self.right_foot_traj_handles = []
         self.ss_duration = ss_duration
         self.thread = None
         self.thread_lock = None
@@ -128,7 +125,8 @@ class StateMachine(Process):
 
         if self.rem_time > 0.:
             if self.cur_stance.is_single_support:
-                self.update_free_foot()
+                progress = 1. - self.rem_time / self.cur_duration
+                self.free_foot.update_pose(progress)
             self.rem_time -= sim.dt
         elif self.cur_stance.is_double_support and not can_switch_to_ss():
             print "COM is not ready for next SS yet"
@@ -161,17 +159,6 @@ class StateMachine(Process):
         self.phase_id += 1
         if self.callback is not None:
             self.callback()
-
-    def update_free_foot(self):
-        progress = 1. - self.rem_time / self.cur_duration
-        prev_pos = self.free_foot.p
-        self.free_foot.update_pose(progress)
-        if self.cur_stance.left_foot:
-            self.right_foot_traj_handles.append(
-                draw_line(prev_pos, self.free_foot.p, color='r', linewidth=3))
-        else:
-            self.left_foot_traj_handles.append(
-                draw_line(prev_pos, self.free_foot.p, color='g', linewidth=3))
 
     def get_preview_targets(self):
         if self.cur_stance.is_single_support \
