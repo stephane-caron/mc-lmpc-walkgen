@@ -21,7 +21,8 @@
 import pymanoid
 import time
 
-from numpy import array, cross, dot, float64, hstack, ones, sqrt, vstack
+# from numpy import float64  # if using pyparma
+from numpy import array, cross, dot, hstack, ones, sqrt, vstack
 from polygons import compute_polygon_hull, intersect_line_cylinder
 from pymanoid.polyhedra import Polytope
 from scipy.spatial.qhull import QhullError
@@ -33,6 +34,34 @@ class TubeError(Exception):
 
 def normalize(v):
     return v / sqrt(dot(v, v))
+
+
+from pyclipper import Pyclipper, PT_CLIP, PT_SUBJECT, CT_INTERSECTION
+from pyclipper import scale_to_clipper, scale_from_clipper
+
+
+def polygon_intersect(polygon1, polygon2):
+    """
+    Intersect two polygons.
+
+    INPUT:
+
+    - ``polygon1`` -- list of vertices in counterclockwise order
+    - ``polygon2`` -- same
+
+    OUTPUT:
+
+    Vertices of the intersection in counterclockwise order.
+    """
+    # could be accelerated by removing the scale_to/from_clipper()
+    subj, clip = (polygon1,), polygon2
+    pc = Pyclipper()
+    pc.AddPath(scale_to_clipper(clip), PT_CLIP)
+    pc.AddPaths(scale_to_clipper(subj), PT_SUBJECT)
+    solution = pc.Execute(CT_INTERSECTION)
+    if not solution:
+        return []
+    return scale_from_clipper(solution)[0]
 
 
 def reduce_polar_system(B, c):
@@ -51,7 +80,12 @@ def reduce_polar_system(B, c):
         (B[:, column] / sigma).reshape((B.shape[0], 1))
         for column in [0, 1]])
 
-    vertices2d = compute_polygon_hull(B2, ones(len(c)))
+    return compute_polygon_hull(B2, ones(len(c)))
+
+
+def polar_to_polytope(vertices2d):
+    gravity = pymanoid.get_gravity()
+    g = -gravity[2]
 
     def vertices_at(z):
         v = [array([a * (g - z), b * (g - z)]) for (a, b) in vertices2d]
@@ -91,19 +125,11 @@ class COMTube(object):
         self.start_com = start_com
         self.start_stance = start_stance
         self.target_com = target_com
-
-        # all other computations depend on the primal V-rep:
-        t0 = time.time()
+        #
         self.compute_primal_vrep()
         self.compute_primal_hrep()
         self.compute_dual_vrep()
         self.compute_dual_hrep()
-        print "kron: %.1f ms" % (1000. * (time.time() - t0))
-
-    """
-    Primal polytopes
-    ================
-    """
 
     def compute_primal_vrep(self):
         t0 = time.time()
