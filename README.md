@@ -58,12 +58,11 @@ There are three Python scripts you can run:
   computed at each time instant: in case of failure, the skyblue background
   becomes red. When supporting forces are found again, the red background takes
   a "tainted" color between red and blue.
-- [static\_equilibrium/comparison.py](/static_equilibrium/comparison.py)
-  compares computation times for four different algorithms calculating the
-  static-equilibrium polygon (see the Appendix of the paper). Requires
-  [IPython](https://ipython.org/) in order to use the ``%timeit`` function.
-- [static\_equilibrium/figure2.py](/static_equilibrium/figure2.py) generates
-  Figure 2 from the paper.
+- [sep/comparison.py](/sep/comparison.py) compares computation times for four
+  different algorithms calculating the static-equilibrium polygon (see the
+  Appendix of the paper). Requires [IPython](https://ipython.org/) in order to
+  use the ``%timeit`` function.
+- [sep/figure2.py](/sep/figure2.py) generates Figure 2 from the paper.
 
 Due to the copyright problem, we cannot release the COLLADA model ``HRP4R.dae``
 used to produce the accompanying video. We have replaced it with the
