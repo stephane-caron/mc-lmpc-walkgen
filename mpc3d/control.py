@@ -233,14 +233,6 @@ class TubePreviewControl(Process):
         next_stance = self.fsm.next_stance
         preview_targets = self.fsm.get_preview_targets()
         switch_time, horizon, target_com, target_comd = preview_targets
-
-        # target_moved = norm(target_com - self.target_box.p) > 1e-3
-        # phase_switched = self.fsm.phase_id > self.last_phase_id
-        self.target_box.set_pos(target_com)
-
-        self.last_phase_id = self.fsm.phase_id
-        self.tube = COMTube(
-            cur_com, target_com, cur_stance, next_stance, self.tube_radius)
         if True:
             print "\nVelocities:"
             print "- |cur_comd| =", norm(cur_comd)
@@ -250,13 +242,19 @@ class TubePreviewControl(Process):
             print "- switch_time =", switch_time
             print "- timestep = ", horizon / self.nb_mpc_steps
             print""
+        # target_moved = norm(target_com - self.target_box.p) > 1e-3
+        # phase_switched = self.fsm.phase_id > self.last_phase_id
+        self.target_box.set_pos(target_com)
+        # self.last_phase_id = self.fsm.phase_id
         try:
-            preview_control = COMPreviewControl(
-                cur_com, cur_comd, target_com, target_comd, self.tube, horizon,
-                switch_time, self.nb_mpc_steps)
+            self.tube = COMTube(
+                cur_com, target_com, cur_stance, next_stance, self.tube_radius)
         except TubeError as e:
             print "Tube error: %s" % str(e)
             return
+        preview_control = COMPreviewControl(
+            cur_com, cur_comd, target_com, target_comd, self.tube, horizon,
+            switch_time, self.nb_mpc_steps)
         preview_control.compute_dynamics()
         try:
             preview_control.compute_control()
