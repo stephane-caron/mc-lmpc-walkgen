@@ -47,7 +47,7 @@ def compute_polygon_hull(B, c):
 
     OUTPUT:
 
-    List of 2D vertices.
+    List of 2D vertices in counterclowise order.
 
     .. NOTE::
 
@@ -78,7 +78,14 @@ def compute_polygon_hull(B, c):
     # but raises QhullError at the first sight of precision errors.
     #
     hull = ConvexHull([row for row in B_polar], qhull_options='Pp Q0')
-    vertices = [axis_intersection(i, j) for (i, j) in hull.simplices]
+    #
+    # contrary to hull.simplices (which was not in practice), hull.vertices is
+    # guaranteed to be in counterclockwise order for 2-D (see scipy doc)
+    #
+    simplices = [(hull.vertices[i], hull.vertices[i + 1])
+                 for i in xrange(len(hull.vertices) - 1)]
+    simplices.append((hull.vertices[-1], hull.vertices[0]))
+    vertices = [axis_intersection(i, j) for (i, j) in simplices]
     return vertices
 
 
