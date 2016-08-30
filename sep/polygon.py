@@ -30,16 +30,16 @@ except ImportError:
     import pymanoid
 
 try:
-    from mpc3d.cwc import compute_cwc_pyparma
-    from mpc3d.polygons import compute_polygon_hull
+    from wpg.cwc import compute_cwc_pyparma
+    from wpg.polygons import compute_polygon_hull
 except ImportError:
     script_path = os.path.realpath(__file__)
     sys.path.append(os.path.dirname(script_path) + '/..')
-    from mpc3d.cwc import compute_cwc_pyparma
-    from mpc3d.polygons import compute_polygon_hull
+    from wpg.cwc import compute_cwc_pyparma
+    from wpg.polygons import compute_polygon_hull
 
 from numpy import array, dot, hstack, vstack, zeros
-from polytope_projection import project_polytope_bretl
+from projection import project_polytope_bretl
 
 
 def compute_static_equilibrium_lp(contact_set):

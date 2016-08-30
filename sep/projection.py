@@ -18,7 +18,7 @@
 # You should have received a copy of the GNU General Public License along with
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
-import bretl_projection
+import bretl
 import cdd
 import cvxopt
 
@@ -77,9 +77,9 @@ def project_polytope_bretl(A, b, C, d, E, f, box_size=42):
 
     lp_obj = cvxopt.matrix(zeros(A.shape[1] + 2))
     lp = lp_obj, A_ext, b_ext, C_ext, d_ext
-    res, P = bretl_projection.ComputePolygon(lp)
+    res, P = bretl.ComputePolygon(lp)
     if not res:
-        msg = "bretl_projection.ComputePolygon: "
+        msg = "bretl.ComputePolygon: "
         msg += "could not optimize in direction %s" % str(P)
         raise Exception(msg)
 

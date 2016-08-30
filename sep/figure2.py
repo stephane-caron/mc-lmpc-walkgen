@@ -34,15 +34,15 @@ except ImportError:
     from pymanoid.tasks import COMTask
 
 try:
-    from mpc3d.cwc import compute_cwc_pyparma
+    from wpg.cwc import compute_cwc_pyparma
 except ImportError:
     script_path = os.path.realpath(__file__)
     sys.path.append(os.path.dirname(script_path) + '/..')
-    from mpc3d.cwc import compute_cwc_pyparma
+    from wpg.cwc import compute_cwc_pyparma
 
 from numpy import array, cross, dot, hstack, ones
-from static_equilibrium_polygon import compute_polygon_hull
-from static_equilibrium_polygon import draw_static_polygon
+from polygon import compute_polygon_hull
+from polygon import draw_static_polygon
 
 try:
     from hrp4_pymanoid import HRP4 as RobotModel

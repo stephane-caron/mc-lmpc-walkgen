@@ -37,10 +37,10 @@ except ImportError:
     from pymanoid.tasks import COMTask
 
 from scipy.spatial import ConvexHull
-from static_equilibrium_polygon import compute_static_polygon_bretl
-from static_equilibrium_polygon import compute_static_polygon_cdd_hull
-from static_equilibrium_polygon import compute_static_polygon_pyparma_hull
-from static_equilibrium_polygon import compute_static_polygon_cdd_only
+from polygon import compute_static_polygon_bretl
+from polygon import compute_static_polygon_cdd_hull
+from polygon import compute_static_polygon_pyparma_hull
+from polygon import compute_static_polygon_cdd_only
 
 try:
     from hrp4_pymanoid import HRP4 as RobotModel

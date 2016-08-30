@@ -41,17 +41,17 @@ except ImportError:
     from pymanoid.draw import draw_3d_cone, draw_polyhedron
 
 try:
-    from mpc3d.buffer import PreviewBuffer
-    from mpc3d.control import TubePreviewControl
-    from mpc3d.fsm import StateMachine
-    from mpc3d.simulation import Process, Simulation
+    from wpg.buffer import PreviewBuffer
+    from wpg.control import TubePreviewControl
+    from wpg.fsm import StateMachine
+    from wpg.simulation import Process, Simulation
 except ImportError:
     script_path = os.path.realpath(__file__)
     sys.path.append(os.path.dirname(script_path) + '/..')
-    from mpc3d.buffer import PreviewBuffer
-    from mpc3d.control import TubePreviewControl
-    from mpc3d.fsm import StateMachine
-    from mpc3d.simulation import Process, Simulation
+    from wpg.buffer import PreviewBuffer
+    from wpg.control import TubePreviewControl
+    from wpg.fsm import StateMachine
+    from wpg.simulation import Process, Simulation
 
 from numpy import arange, cos, hstack, pi, sin, zeros, array
 from numpy.random import random, seed
