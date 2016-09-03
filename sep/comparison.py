@@ -50,6 +50,7 @@ except ImportError:
 
 cyan = (0., 0.5, 0.5, 0.5)
 robot = None
+custom_mass = 39
 robot_mass = 39  # [kg], updated once robot model is loaded
 dt = 3e-2  # [s]
 robot_lock = threading.Lock()
@@ -146,7 +147,8 @@ def draw_cdd_only_thread():
             time.sleep(dt)
             continue
         try:
-            vertices = compute_static_polygon_cdd_only(contacts, robot_mass)
+            # you can vary ``custom_mass`` to check that it has no effect
+            vertices = compute_static_polygon_cdd_only(contacts, custom_mass)
             gui_handles['cdd_only'] = draw_com_polygon(vertices, black)
         except Exception as e:
             print "draw_cdd_only_thread:", e
