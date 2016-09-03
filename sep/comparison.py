@@ -36,6 +36,7 @@ except ImportError:
     import pymanoid
     from pymanoid.tasks import COMTask
 
+from numpy.random import random
 from scipy.spatial import ConvexHull
 from polygon import compute_static_polygon_bretl
 from polygon import compute_static_polygon_cdd_hull
@@ -199,6 +200,9 @@ def prepare_screenshot(ambient=1., diffuse=0.8):
 
 
 def benchmark():
+    # first, we call this one once as it will round contacts RPY
+    compute_static_polygon_cdd_only(contacts, robot_mass)
+    print ""
     print "Benchmarking computation times"
     print "------------------------------"
     function_calls = ['compute_static_polygon_cdd_hull(contacts)',
@@ -209,6 +213,17 @@ def benchmark():
         print "\n%%timeit %s" % call
         for _ in xrange(1):
             IPython.get_ipython().magic(u'timeit %s' % call)
+
+
+def sample_contacts():
+    for c in contacts.contacts:
+        c.set_pos(random(3))
+        c.set_rpy(0. * random(3))
+    try:
+        # compute_static_polygon_cdd_only(contacts, custom_mass)
+        compute_static_polygon_cdd_hull(contacts)
+    except:
+        return sample_contacts()
 
 
 if __name__ == "__main__":
@@ -262,8 +277,12 @@ if __name__ == "__main__":
     print "- Green area: computed using Bretl and Lall's method"
     print "- Black area: computed using cdd only"
     print ""
+    print "Run ``benchmark()`` to compare computation times."
+    print ""
+    print "Run ``sample_contacts()`` to sample a new contact configuration."
+    print ""
 
-    benchmark()
+    # benchmark()
 
     thread.start_new_thread(run_ik_thread, ())
     thread.start_new_thread(draw_cdd_thread, ())
