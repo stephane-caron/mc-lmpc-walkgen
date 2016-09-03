@@ -198,6 +198,19 @@ def prepare_screenshot(ambient=1., diffuse=0.8):
         [0.,  0.,  0.,  1.]])
 
 
+def benchmark():
+    print "Benchmarking computation times"
+    print "------------------------------"
+    function_calls = ['compute_static_polygon_cdd_hull(contacts)',
+                      'compute_static_polygon_pyparma_hull(contacts)',
+                      'compute_static_polygon_bretl(contacts)',
+                      'compute_static_polygon_cdd_only(contacts, robot_mass)']
+    for call in function_calls:
+        print "\n%%timeit %s" % call
+        for _ in xrange(1):
+            IPython.get_ipython().magic(u'timeit %s' % call)
+
+
 if __name__ == "__main__":
     if IPython.get_ipython() is None:
         # we use IPython (in interactive mode) for the %timeit function
@@ -247,19 +260,11 @@ if __name__ == "__main__":
     print "- Magenta area: computed using cdd + Qhull"
     print "- Yellow area: computed using Parma + Qhull"
     print "- Green area: computed using Bretl and Lall's method"
+    print "- Black area: computed using cdd only"
     print ""
-    print "Benchmarking computation times"
-    print "------------------------------"
-    function_calls = ['compute_static_polygon_cdd_hull(contacts)',
-                      'compute_static_polygon_pyparma_hull(contacts)',
-                      'compute_static_polygon_bretl(contacts)',
-                      'compute_static_polygon_cdd_only(contacts, robot_mass)']
-    for call in function_calls:
-        print "\n%%timeit %s" % call
-        for _ in xrange(1):
-            IPython.get_ipython().magic(u'timeit %s' % call)
 
-    freeze = False
+    benchmark()
+
     thread.start_new_thread(run_ik_thread, ())
     thread.start_new_thread(draw_cdd_thread, ())
     thread.start_new_thread(draw_bretl_thread, ())

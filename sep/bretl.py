@@ -28,8 +28,11 @@ from scipy.linalg import norm
 from warnings import warn
 from StringIO import StringIO
 
-
+# STFU GLPK:
 cvxopt.solvers.options['show_progress'] = False
+cvxopt.solvers.options['glpk'] = {'msg_lev': 'GLP_MSG_OFF'}  # cvxopt 1.1.8
+cvxopt.solvers.options['msg_lev'] = 'GLP_MSG_OFF'  # cvxopt 1.1.7
+cvxopt.solvers.options['LPX_K_MSGLEV'] = 0         # previous versions of cvxopt
 
 
 class Vertex:
@@ -173,7 +176,8 @@ def OptimizeDirection(vdir, lp):
     lp_q[-2] = -vdir[0]
     lp_q[-1] = -vdir[1]
     try:
-        sol = cvxopt.solvers.lp(lp_q, lp_Gextended, lp_hextended, lp_A, lp_b)
+        sol = cvxopt.solvers.lp(lp_q, lp_Gextended, lp_hextended, lp_A, lp_b,
+                                solver='glpk')
         if sol['status'] == 'optimal':
             z = sol['x']
             z = array(z).reshape((lp_q.size[0], ))
