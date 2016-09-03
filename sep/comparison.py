@@ -72,15 +72,11 @@ G_link = 0.9 / dt
 w_link = 100.
 w_com = 005.
 w_reg = 001.
-freeze = False
 screenshot = False
 
 
 def run_ik_thread():
     while True:
-        if freeze:
-            time.sleep(dt)
-            continue
         with robot_lock:
             if robot is not None:
                 robot.step_ik(dt)
@@ -99,9 +95,6 @@ def draw_com_polygon(vertices, color):
 
 def draw_cdd_thread():
     while True:
-        if freeze:
-            time.sleep(dt)
-            continue
         try:
             vertices = compute_static_polygon_cdd_hull(contacts)
             if vertices:
@@ -114,9 +107,6 @@ def draw_cdd_thread():
 
 def draw_pyparma_thread():
     while True:
-        if freeze or screenshot:
-            time.sleep(dt)
-            continue
         try:
             vertices = compute_static_polygon_pyparma_hull(contacts)
             if vertices:
@@ -129,9 +119,6 @@ def draw_pyparma_thread():
 
 def draw_bretl_thread():
     while True:
-        if freeze or screenshot:
-            time.sleep(dt)
-            continue
         try:
             vertices = compute_static_polygon_bretl(contacts)
             gui_handles['bretl'] = draw_com_polygon(vertices, cyan)
@@ -143,9 +130,6 @@ def draw_bretl_thread():
 
 def draw_cdd_only_thread():
     while True:
-        if freeze or screenshot:
-            time.sleep(dt)
-            continue
         try:
             # you can vary ``custom_mass`` to check that it has no effect
             vertices = compute_static_polygon_cdd_only(contacts, custom_mass)
