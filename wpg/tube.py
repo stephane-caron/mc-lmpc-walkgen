@@ -88,10 +88,10 @@ def polar_to_polytope(vertices2d):
     g = -gravity[2]
 
     def vertices_at(z):
-        v = [array([a * (g - z), b * (g - z)]) for (a, b) in vertices2d]
+        v = [array([a * (g + z), b * (g + z)]) for (a, b) in vertices2d]
         return [array([x, y, z]) for (x, y) in v]
 
-    return [array([0, 0, g])] + vertices_at(z=-g)
+    return [array([0, 0, -g])] + vertices_at(z=+g)
 
 
 class COMTube(object):

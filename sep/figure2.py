@@ -141,11 +141,10 @@ def compute_acceleration_set(contact_set, p_com, display_scale=0.05):
     vertices2d = compute_polygon_hull(B2, ones(len(c)))
 
     def vertices_at(z):
-        v = [array([a * (g - z), b * (g - z)]) for (a, b) in vertices2d]
-        # v = simplify_polygon(v)
+        v = [array([a * (g + z), b * (g + z)]) for (a, b) in vertices2d]
         return [array([x, y, z]) for (x, y) in v]
 
-    return [array([0, 0, g])] + vertices_at(z=-g)
+    return [array([0, 0, -g])] + vertices_at(z=+g)
 
 
 def draw_cone_thread():
