@@ -189,6 +189,7 @@ class ForceDrawer(Process):
 class PreviewDrawer(Process):
 
     def __init__(self):
+        self.draw_free_traj = False
         self.handles = []
 
     def on_tick(self, sim):
@@ -206,17 +207,18 @@ class PreviewDrawer(Process):
             comd_pre += comdd * dT
             color = \
                 'b' if preview_index <= preview_buffer.preview.switch_step \
-                else 'r'
+                else 'y'
             self.handles.append(
                 draw_point(com_pre, color=color, pointsize=0.005))
             self.handles.append(
                 draw_line(com_pre0, com_pre, color=color, linewidth=3))
-            com_free0 = com_free
-            com_free = com_free + comd_free * dT
-            self.handles.append(
-                draw_point(com_free, color='g', pointsize=0.005))
-            self.handles.append(
-                draw_line(com_free0, com_free, color='g', linewidth=3))
+            if self.draw_free_traj:
+                com_free0 = com_free
+                com_free = com_free + comd_free * dT
+                self.handles.append(
+                    draw_point(com_free, color='g', pointsize=0.005))
+                self.handles.append(
+                    draw_line(com_free0, com_free, color='g', linewidth=3))
 
 
 class ScreenshotTaker(Process):
@@ -259,25 +261,35 @@ class SEPDrawer(Process):
 class TrajectoryDrawer(Process):
 
     def __init__(self, body, combined='b-', color=None, linewidth=3,
-                 linestyle=None):
+                 linestyle=None, lr=None):
         color = color if color is not None else combined[0]
         linestyle = linestyle if linestyle is not None else combined[1]
         assert linestyle in ['-', '.']
         self.body = body
+        if lr is not None:
+            self.body = fsm.free_foot
         self.color = color
         self.handles = []
         self.last_pos = body.p
         self.linestyle = linestyle
         self.linewidth = linewidth
-        self.parity = True
+        self.lr = lr
 
     def on_tick(self, sim):
-        if self.linestyle == '-' or self.parity:
+        if not (self.lr is None or
+                self.lr == 0 and fsm.cur_phase == 'SS-R' or
+                self.lr == 1 and fsm.cur_phase == 'SS-L'):
+            return
+        if self.linestyle == '-':
             self.handles.append(draw_line(
                 self.last_pos, self.body.p, color=self.color,
                 linewidth=self.linewidth))
         self.last_pos = self.body.p
-        self.parity = not self.parity
+
+    def dash_graph_handles(self):
+        for i in xrange(len(self.handles)):
+            if i % 2 == 0:
+                self.handles[i] = None
 
 
 class TubeDrawer(Process):
@@ -286,10 +298,10 @@ class TubeDrawer(Process):
         self.comdd_handle = []
         self.cone_handles = []
         self.poly_handles = []
-        self.tz = 1.1
+        self.acc_scale = 0.05
+        self.trans = array([0., 0., 1.1])
 
     def on_tick(self, sim):
-        scale = 0.05
         try:
             self.draw_primal(mpc.tube)
         except Exception as e:
@@ -298,15 +310,13 @@ class TubeDrawer(Process):
             self.draw_dual(mpc.tube)
         except Exception as e:
             print "Drawing of dual cones failed: %s" % str(e)
-        tz = self.tz
-        comdd = scale * preview_buffer.comdd + [0., 0., tz]
-        self.comdd_handle = [
-            draw_line([0, 0, tz], comdd, color='r', linewidth=3),
-            draw_points([[0, 0, tz], comdd], color='r', pointsize=0.005)]
+        if True:
+            self.draw_comdd()
 
     def draw_primal(self, tube):
         self.poly_handles = []
         colors = [(0.5, 0.5, 0., 0.3), (0., 0.5, 0.5, 0.3)]
+        colors = [(0.5, 0.0, 0.0, 0.3), (0.5, 0.0, 0.0, 0.3)]
         if tube.start_stance.is_single_support:
             colors.reverse()
         for (i, vertices) in enumerate(tube.primal_vrep):
@@ -320,22 +330,43 @@ class TubeDrawer(Process):
 
     def draw_dual(self, tube):
         self.cone_handles = []
-        scale, tz = 0.05, self.tz
-        apex = [0., 0., scale * 9.81 + tz]
+        self.trans = tube.target_com - [0., 0., self.acc_scale * -9.81]
+        apex = [0., 0., self.acc_scale * -9.81] + self.trans
         colors = [(0.5, 0.5, 0., 0.3), (0., 0.5, 0.5, 0.3)]
+        colors = [(0.0, 0.5, 0.0, 0.3), (0., 0.5, 0.0, 0.3)]
         if tube.start_stance.is_single_support:
             colors.reverse()
         for (stance_id, cone_vertices) in enumerate(tube.dual_vrep):
+            if stance_id == 0:
+                continue
             color = colors[stance_id]
-            vscale = [scale * array(v) + [0., 0., tz] for v in cone_vertices]
+            vscale = [self.acc_scale * array(v) + self.trans
+                      for v in cone_vertices]
             self.cone_handles.extend(draw_3d_cone(
                 # recall that cone_vertices[0] is [0, 0, +g]
                 apex=apex, axis=[0, 0, 1], section=vscale[1:],
                 combined='r-#', color=color))
 
+    def draw_comdd(self):
+        comdd = self.acc_scale * preview_buffer.comdd + self.trans
+        self.comdd_handle = [
+            draw_line(self.trans, comdd, color='r', linewidth=3),
+            draw_points([self.trans, comdd], color='r', pointsize=0.005)]
+
 
 def set_camera_cones():
     set_camera_top(x=0, y=0, z=0.1 * 9.81)
+
+
+def suntan_hrp(ambient=0., diffuse=0.85):
+    with robot_lock:
+        robot.set_transparency(0)
+        for link in robot.rave.GetLinks():
+            if len(link.GetGeometries()) > 0:
+                geom = link.GetGeometries()[0]
+                geom.SetAmbientColor([ambient] * 3)
+                geom.SetDiffuseColor([diffuse] * 3)
+
 
 if __name__ == "__main__":
     seed(42)
@@ -420,23 +451,16 @@ if __name__ == "__main__":
     robot.start_ik_thread(dt)
 
     com_traj_drawer = TrajectoryDrawer(com, 'b-')
-    forces_drawer = ForceDrawer()
-    left_foot_traj_drawer = TrajectoryDrawer(robot.left_foot, 'g-')
-    preview_drawer = PreviewDrawer()
-    right_foot_traj_drawer = TrajectoryDrawer(robot.right_foot, 'r-')
-    screenshots = None
-    # screenshots = ScreenshotTaker()  # comment this to disable recording
-    sep_drawer = SEPDrawer()
-    tube_drawer = TubeDrawer()
+    left_foot_traj_drawer = TrajectoryDrawer(robot.left_foot, 'g-', lr=0)
+    right_foot_traj_drawer = TrajectoryDrawer(robot.right_foot, 'r-', lr=1)
     sim.schedule_extra(com_traj_drawer)
-    sim.schedule_extra(forces_drawer)
+    # sim.schedule_extra(ForceDrawer())
     sim.schedule_extra(left_foot_traj_drawer)
-    sim.schedule_extra(preview_drawer)
+    sim.schedule_extra(PreviewDrawer())
     sim.schedule_extra(right_foot_traj_drawer)
-    if screenshots:
-        sim.schedule_extra(screenshots)
-    sim.schedule_extra(sep_drawer)
-    sim.schedule_extra(tube_drawer)
+    # sim.schedule_extra(ScreenshotTaker())
+    # sim.schedule_extra(SEPDrawer())
+    sim.schedule_extra(TubeDrawer())
 
     set_camera_1()
     if True:
