@@ -19,7 +19,7 @@ at marginal cost and directly applied in a model-predictive controller. We
 finally implement this pipeline and exemplify it with the HRP-4 humanoid model
 in multi-contact dynamically walking scenarios.
 
-<img src="https://scaron.info/images/pre-print-2016-1.png" height="251" />
+<img src="https://scaron.info/images/pre-print-2016-1-fixed.png" height="250" />
 
 Authors:
 [Stéphane Caron](https://scaron.info) and
