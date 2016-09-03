@@ -91,6 +91,10 @@ def compute_static_polygon_cdd_only(contact_set, mass):
         than the equality-set projection algorithm, as described in
         http://arxiv.org/abs/1510.03232.
     """
+    for c in contact_set:
+        # cdd is sensitive to orientation epsilons, so we filter them out
+        c.set_rpy([round(x, 3) for x in [c.roll, c.pitch, c.yaw]])
+
     G = contact_set.compute_grasp_matrix([0, 0, 0])
     F = contact_set.compute_stacked_wrench_cones()
     b = zeros((F.shape[0], 1))
@@ -111,7 +115,7 @@ def compute_static_polygon_cdd_only(contact_set, mass):
     P = cdd.Polyhedron(M)
     V = array(P.get_generators())
     if V.shape[0] < 1:
-        return [], []
+        return []
 
     # COM position from GAW:  [pGx, pGy] = D * [GAW_1 GAW_2 ...]
     D = 1. / (mass * 9.81) * vstack([-G[4, :], +G[3, :]])
