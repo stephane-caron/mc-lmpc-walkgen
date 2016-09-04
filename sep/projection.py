@@ -25,7 +25,7 @@ import cvxopt
 from numpy import array, dot, hstack, zeros
 
 
-def project_polytope_bretl(A, b, C, d, E, f, box_size=42):
+def project_polytope_bretl(A, b, C, d, E, f, box_size=42, solver='glpk'):
     """
     Project a polytope using an incremental projection algorithm.
 
@@ -77,7 +77,7 @@ def project_polytope_bretl(A, b, C, d, E, f, box_size=42):
 
     lp_obj = cvxopt.matrix(zeros(A.shape[1] + 2))
     lp = lp_obj, A_ext, b_ext, C_ext, d_ext
-    res, P = bretl.ComputePolygon(lp)
+    res, P = bretl.ComputePolygon(lp, solver=solver)
     if not res:
         msg = "bretl.ComputePolygon: "
         msg += "could not optimize in direction %s" % str(P)

@@ -56,9 +56,9 @@ except ImportError:
 from numpy import arange, cos, hstack, pi, sin, zeros, array
 from numpy.random import random, seed
 
-try:
-    from hrp4_pymanoid import HRP4 as RobotModel
-except ImportError:
+if os.path.isfile('HRP4R.dae'):
+    from pymanoid.robots import HRP4 as RobotModel
+else:  # default to JVRC-1
     from pymanoid.robots import JVRC1 as RobotModel
 
 

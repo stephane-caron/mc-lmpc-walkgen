@@ -35,6 +35,8 @@ class AvgStdEstimator(object):
 
     def get_all(self):
         avg = self.x / self.n
+        if self.n == 1:
+            return (avg, 0., 1)
         unbiased = sqrt(self.n * 1. / (self.n - 1))
         std = unbiased * sqrt(self.x2 / self.n - avg ** 2)
         return (avg, std, self.n)

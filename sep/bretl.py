@@ -32,7 +32,7 @@ from StringIO import StringIO
 cvxopt.solvers.options['show_progress'] = False
 cvxopt.solvers.options['glpk'] = {'msg_lev': 'GLP_MSG_OFF'}  # cvxopt 1.1.8
 cvxopt.solvers.options['msg_lev'] = 'GLP_MSG_OFF'  # cvxopt 1.1.7
-cvxopt.solvers.options['LPX_K_MSGLEV'] = 0         # previous versions of cvxopt
+cvxopt.solvers.options['LPX_K_MSGLEV'] = 0  # previous versions
 
 # GLPK is the fastest LP solver we could find so far,
 # see <https://scaron.info/blog/linear-programming-in-python-with-cvxopt.html>
@@ -173,14 +173,14 @@ class Polygon:
             v.Print()
 
 
-def OptimizeDirection(vdir, lp):
+def OptimizeDirection(vdir, lp, solver='glpk'):
     """Optimize in one direction."""
     lp_q, lp_Gextended, lp_hextended, lp_A, lp_b = lp
     lp_q[-2] = -vdir[0]
     lp_q[-1] = -vdir[1]
     try:
         sol = cvxopt.solvers.lp(
-            lp_q, lp_Gextended, lp_hextended, lp_A, lp_b, solver='glpk')
+            lp_q, lp_Gextended, lp_hextended, lp_A, lp_b, solver=solver)
         if sol['status'] == 'optimal':
             z = sol['x']
             z = array(z).reshape((lp_q.size[0], ))
@@ -193,19 +193,19 @@ def OptimizeDirection(vdir, lp):
         return False, 0
 
 
-def ComputePolygon(lp):
+def ComputePolygon(lp, solver='glpk'):
     """Expand a polygon iteratively."""
     theta = pi * random()
     d1 = array([cos(theta), sin(theta)])
     d2 = array([cos(theta + 2 * pi / 3), sin(theta + 2 * pi / 3)])
     d3 = array([cos(theta + 4 * pi / 3), sin(theta + 4 * pi / 3)])
-    res, z1 = OptimizeDirection(d1, lp)
+    res, z1 = OptimizeDirection(d1, lp, solver=solver)
     if not res:
         return False, d1
-    res, z2 = OptimizeDirection(d2, lp)
+    res, z2 = OptimizeDirection(d2, lp, solver=solver)
     if not res:
         return False, d2
-    res, z3 = OptimizeDirection(d3, lp)
+    res, z3 = OptimizeDirection(d3, lp, solver=solver)
     if not res:
         return False, d3
     v1 = Vertex(z1)

@@ -23,7 +23,7 @@ import re
 import sys
 
 script_path = os.path.realpath(__file__)
-sys.path.append(os.path.dirname(script_path) + '/../wpg')
+sys.path.append(os.path.dirname(script_path) + '/../../wpg')
 
 from stats import AvgStdEstimator
 
@@ -36,14 +36,22 @@ if __name__ == '__main__':
             if "timeit" not in line:
                 continue
             names = re.findall('[a-z_]+\(.*\)', line)
-            times = re.findall('\d+\.\d+', line)
-            assert len(names) < 2
-            assert len(times) < 2
-            if len(names) < 1 or len(times) < 1:
-                print "IGNORED:", line, "END OF IGNORED LINE"
+            times = re.findall('\: \d+ ms', line)
+            if len(times) == 1:
+                time = float(times[0][2:-3])
+            else:
+                times = re.findall('\d+\.\d+ ms', line)
+                if len(times) == 1:
+                    time = float(times[0][:-3])
+                else:
+                    times = re.findall('\d+ us', line)
+                    if len(times) == 1:
+                        time = float(times[0][:-3]) / 1000.
+            if len(names) != 1 or len(times) != 1:
+                print "IGNORED:\n", line, "END OF IGNORED LINE"
                 continue
+            # print "line=", line, "time=", time
             name = names[0]
-            time = float(times[0])
             if name not in d:
                 d[name] = AvgStdEstimator()
             d[name].add(time)

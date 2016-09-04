@@ -56,9 +56,9 @@ def compute_static_equilibrium_lp(contact_set):
     return (A, b, C, d, E, f)
 
 
-def compute_static_polygon_bretl(contact_set):
+def compute_static_polygon_bretl(contact_set, solver='glpk'):
     A, b, C, d, E, f = compute_static_equilibrium_lp(contact_set)
-    vertices, _ = project_polytope_bretl(A, b, C, d, E, f)
+    vertices, _ = project_polytope_bretl(A, b, C, d, E, f, solver=solver)
     return vertices
 
 
