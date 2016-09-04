@@ -49,19 +49,20 @@ except ImportError:
     from pymanoid.robots import JVRC1 as RobotModel
 
 
-cyan = (0., 0.5, 0.5, 0.5)
-robot = None
+black = (0., 0., 0., 0.5)
 custom_mass = 39
-robot_mass = 39  # [kg], updated once robot model is loaded
+cyan = (0., 0.5, 0.5, 0.5)
 dt = 3e-2  # [s]
-robot_lock = threading.Lock()
 green = (0., 0.5, 0., 0.5)
 gui_handles = {}
 handles = [None, None]
 magenta = (0.5, 0., 0.5, 0.5)
-yellow = (0.5, 0.5, 0., 0.5)
-black = (0., 0., 0., 0.5)
+robot = None
+robot_lock = threading.Lock()
+robot_mass = 39  # [kg], updated once robot model is loaded
 saved_handles = []
+threads = []
+yellow = (0.5, 0.5, 0., 0.5)
 z_high = 1.5
 z_mid = 0.75
 
@@ -200,6 +201,7 @@ def prepare_screenshot(ambient=1., diffuse=0.8):
 
 
 def benchmark():
+    assert not threads
     # first, we call this one once as it will round contacts RPY
     compute_static_polygon_cdd_only(contacts, robot_mass)
     print ""
@@ -210,7 +212,7 @@ def benchmark():
                       'compute_static_polygon_bretl(contacts)',
                       'compute_static_polygon_cdd_only(contacts, robot_mass)']
     for call in function_calls:
-        print "\n%%timeit %s" % call
+        print "\n%%timeit %s\t" % call,
         for _ in xrange(1):
             IPython.get_ipython().magic(u'timeit %s' % call)
 
@@ -218,9 +220,9 @@ def benchmark():
 def sample_contacts():
     for c in contacts.contacts:
         c.set_pos(random(3))
-        c.set_rpy(0. * random(3))
+        c.set_rpy(random(3))
     try:
-        # compute_static_polygon_cdd_only(contacts, custom_mass)
+        # check that polygon contains the origin:
         compute_static_polygon_cdd_hull(contacts)
     except:
         return sample_contacts()
@@ -267,26 +269,25 @@ if __name__ == "__main__":
             robot.generate_posture(contacts)
             robot.ik.add_task(COMTask(robot, com_target))
 
-    print ""
-    print "Static-equilibrium polygon computations"
-    print "======================================="
-    print ""
-    print "Legend:"
-    print "- Magenta area: computed using cdd + Qhull"
-    print "- Yellow area: computed using Parma + Qhull"
-    print "- Green area: computed using Bretl and Lall's method"
-    print "- Black area: computed using cdd only"
-    print ""
-    print "Run ``benchmark()`` to compare computation times."
-    print ""
-    print "Run ``sample_contacts()`` to sample a new contact configuration."
-    print ""
+    print """
+Static-equilibrium polygon computations
+=======================================
 
-    # benchmark()
+Legend:
+- Magenta area: computed using cdd + Qhull
+- Yellow area: computed using Parma + Qhull
+- Green area: computed using Bretl and Lall's method
+- Black area: computed using cdd only
 
-    thread.start_new_thread(run_ik_thread, ())
-    thread.start_new_thread(draw_cdd_thread, ())
-    thread.start_new_thread(draw_bretl_thread, ())
-    thread.start_new_thread(draw_pyparma_thread, ())
-    thread.start_new_thread(draw_cdd_only_thread, ())
+From there, you can run:
+
+- ``benchmark()`` -- compare computation times on current contact configuration
+- ``sample_contacts()`` -- sample a new contact configuration"""
+
+    if False:
+        threads.append(thread.start_new_thread(run_ik_thread, ()))
+        threads.append(thread.start_new_thread(draw_cdd_thread, ()))
+        threads.append(thread.start_new_thread(draw_bretl_thread, ()))
+        threads.append(thread.start_new_thread(draw_pyparma_thread, ()))
+        threads.append(thread.start_new_thread(draw_cdd_only_thread, ()))
     contacts.start_force_thread(com_target, robot_mass, dt=1e-2)
