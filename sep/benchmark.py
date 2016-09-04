@@ -36,6 +36,7 @@ except ImportError:
     import pymanoid
     from pymanoid.tasks import COMTask
 
+from numpy import pi
 from numpy.random import random
 from scipy.spatial import ConvexHull
 from polygon import compute_static_polygon_bretl
@@ -212,15 +213,15 @@ def benchmark():
                       'compute_static_polygon_bretl(contacts)',
                       'compute_static_polygon_cdd_only(contacts, robot_mass)']
     for call in function_calls:
-        print "\n%%timeit %s\t" % call,
+        print "\n%%timeit %s" % call,
         for _ in xrange(1):
             IPython.get_ipython().magic(u'timeit %s' % call)
 
 
 def sample_contacts():
     for c in contacts.contacts:
-        c.set_pos(random(3))
-        c.set_rpy(random(3))
+        c.set_pos(1. * (2. * random(3) - 1.))
+        c.set_rpy(pi / 2. * (2. * random(3) - 1.))
     try:
         # check that polygon contains the origin:
         compute_static_polygon_cdd_hull(contacts)
@@ -283,6 +284,10 @@ From there, you can run:
 
 - ``benchmark()`` -- compare computation times on current contact configuration
 - ``sample_contacts()`` -- sample a new contact configuration"""
+
+    for _ in xrange(10):
+        sample_contacts()
+        benchmark()
 
     if False:
         threads.append(thread.start_new_thread(run_ik_thread, ()))
