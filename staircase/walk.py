@@ -26,19 +26,19 @@ import time
 import threading
 
 try:
+    import pymanoid
     from pymanoid import init, draw_line, draw_points, get_gravity, get_viewer
     from pymanoid import draw_force, draw_polygon, Contact, PointMass
     from pymanoid.tasks import ContactTask, DOFTask, LinkPoseTask, MinCAMTask
-    from pymanoid import set_camera_top, draw_point
-    from pymanoid.draw import draw_3d_cone, draw_polyhedron
+    from pymanoid.draw import draw_3d_cone, draw_point, draw_polyhedron
 except ImportError:
     script_path = os.path.realpath(__file__)
     sys.path.append(os.path.dirname(script_path) + '/../pymanoid')
+    import pymanoid
     from pymanoid import init, draw_line, draw_points, get_gravity, get_viewer
     from pymanoid import draw_force, draw_polygon, Contact, PointMass
     from pymanoid.tasks import ContactTask, DOFTask, LinkPoseTask, MinCAMTask
-    from pymanoid import set_camera_top, draw_point
-    from pymanoid.draw import draw_3d_cone, draw_polyhedron
+    from pymanoid.draw import draw_3d_cone, draw_point, draw_polyhedron
 
 try:
     from wpg.buffer import PreviewBuffer
@@ -56,7 +56,7 @@ except ImportError:
 from numpy import arange, cos, hstack, pi, sin, zeros, array
 from numpy.random import random, seed
 
-if os.path.isfile('HRP4R.dae'):
+if os.path.isfile('./HRP4R.dae'):
     from pymanoid.robots import HRP4 as RobotModel
 else:  # default to JVRC-1
     from pymanoid.robots import JVRC1 as RobotModel
@@ -298,7 +298,7 @@ class TubeDrawer(Process):
         self.comdd_handle = []
         self.cone_handles = []
         self.poly_handles = []
-        self.acc_scale = 0.05
+        self.acc_scale = 0.1
         self.trans = array([0., 0., 1.1])
 
     def on_tick(self, sim):
@@ -330,7 +330,8 @@ class TubeDrawer(Process):
 
     def draw_dual(self, tube):
         self.cone_handles = []
-        self.trans = tube.target_com - [0., 0., self.acc_scale * -9.81]
+        # self.trans = tube.target_com - [0., 0., self.acc_scale * -9.81]
+        self.trans = com.p
         apex = [0., 0., self.acc_scale * -9.81] + self.trans
         colors = [(0.5, 0.5, 0., 0.3), (0., 0.5, 0.5, 0.3)]
         colors = [(0.0, 0.5, 0.0, 0.3), (0., 0.5, 0.0, 0.3)]
@@ -355,7 +356,7 @@ class TubeDrawer(Process):
 
 
 def set_camera_cones():
-    set_camera_top(x=0, y=0, z=0.1 * 9.81)
+    pymanoid.set_camera_top(x=0, y=0, z=0.1 * 9.81)
 
 
 def suntan_hrp(ambient=0., diffuse=0.85):

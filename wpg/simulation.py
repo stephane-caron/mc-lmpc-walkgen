@@ -22,7 +22,6 @@ import time
 
 from stats import AvgStdEstimator
 from threading import Thread
-from logging import warning
 
 
 class Process(object):
@@ -81,8 +80,7 @@ class Simulation(object):
             for process in self.processes:
                 process.on_tick(self)
             rem_time = self.dt - (time.time() - t0)
-            if rem_time < -1e-4:
-                warning("Loop time exhausted by %.1f ms" % (-1000. * rem_time))
+            # TODO: internal sim/real time estimate
             if self.extras:
                 for process in self.extras:
                     process.on_tick(self)

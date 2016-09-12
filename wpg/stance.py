@@ -63,7 +63,7 @@ class Stance(ContactSet):
         self.cwc = self.compute_wrench_cone([0, 0, 0])  # calls cdd
         # self.cwc = compute_cwc_pyparma(self, [0, 0, 0])
         m = RobotModel.mass  # however, the SEP does not depend on this
-        self.sep = self.compute_static_equilibrium_area(m)
+        self.sep = self.compute_static_equilibrium_polygon()
         self.sep_hrep = Polytope.hrep(self.sep)
 
     def dist_to_sep_edge(self, com):

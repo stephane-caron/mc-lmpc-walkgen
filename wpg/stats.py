@@ -34,6 +34,8 @@ class AvgStdEstimator(object):
         self.n += 1
 
     def get_all(self):
+        if self.n < 1:
+            return (None, None, 0)
         avg = self.x / self.n
         if self.n == 1:
             return (avg, 0., 1)
