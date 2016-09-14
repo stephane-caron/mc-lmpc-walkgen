@@ -316,7 +316,7 @@ class TubeDrawer(Process):
     def draw_primal(self, tube):
         self.poly_handles = []
         colors = [(0.5, 0.5, 0., 0.3), (0., 0.5, 0.5, 0.3)]
-        colors = [(0.5, 0.0, 0.0, 0.3), (0.5, 0.0, 0.0, 0.3)]
+        # colors = [(0.5, 0.0, 0.0, 0.3), (0.5, 0.0, 0.0, 0.3)]
         if tube.start_stance.is_single_support:
             colors.reverse()
         for (i, vertices) in enumerate(tube.primal_vrep):
@@ -334,12 +334,12 @@ class TubeDrawer(Process):
         self.trans = com.p
         apex = [0., 0., self.acc_scale * -9.81] + self.trans
         colors = [(0.5, 0.5, 0., 0.3), (0., 0.5, 0.5, 0.3)]
-        colors = [(0.0, 0.5, 0.0, 0.3), (0., 0.5, 0.0, 0.3)]
+        # colors = [(0.0, 0.5, 0.0, 0.3), (0., 0.5, 0.0, 0.3)]
         if tube.start_stance.is_single_support:
             colors.reverse()
         for (stance_id, cone_vertices) in enumerate(tube.dual_vrep):
-            if stance_id == 0:
-                continue
+            # if stance_id == 0:
+            #     continue
             color = colors[stance_id]
             vscale = [self.acc_scale * array(v) + self.trans
                       for v in cone_vertices]
@@ -383,7 +383,7 @@ if __name__ == "__main__":
         angular_step=0.5,
         height=1.4,
         roughness=0.5,
-        friction=0.9,
+        friction=0.7,
         step_dim_x=0.2,
         step_dim_y=0.1)
 
@@ -455,7 +455,7 @@ if __name__ == "__main__":
     left_foot_traj_drawer = TrajectoryDrawer(robot.left_foot, 'g-', lr=0)
     right_foot_traj_drawer = TrajectoryDrawer(robot.right_foot, 'r-', lr=1)
     sim.schedule_extra(com_traj_drawer)
-    # sim.schedule_extra(ForceDrawer())
+    sim.schedule_extra(ForceDrawer())
     sim.schedule_extra(left_foot_traj_drawer)
     sim.schedule_extra(PreviewDrawer())
     sim.schedule_extra(right_foot_traj_drawer)
