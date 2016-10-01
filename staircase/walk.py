@@ -27,6 +27,7 @@ import threading
 
 try:
     from pymanoid import init, draw_line, draw_points, get_gravity, get_viewer
+    from pymanoid import get_env
     from pymanoid import draw_force, draw_polygon, Contact, PointMass
     from pymanoid.tasks import ContactTask, DOFTask, LinkPoseTask, MinCAMTask
     from pymanoid import set_camera_top, draw_point
@@ -35,6 +36,7 @@ except ImportError:
     script_path = os.path.realpath(__file__)
     sys.path.append(os.path.dirname(script_path) + '/../pymanoid')
     from pymanoid import init, draw_line, draw_points, get_gravity, get_viewer
+    from pymanoid import get_env
     from pymanoid import draw_force, draw_polygon, Contact, PointMass
     from pymanoid.tasks import ContactTask, DOFTask, LinkPoseTask, MinCAMTask
     from pymanoid import set_camera_top, draw_point
@@ -371,11 +373,12 @@ def suntan_hrp(ambient=0., diffuse=0.85):
 if __name__ == "__main__":
     seed(42)
     init()
-    viewer = get_viewer()
-    set_camera_0()
     robot = RobotModel(download_if_needed=True)
     robot_mass = robot.mass  # saved here to avoid taking robot_lock
+    get_env().SetViewer('qtcoin')
     robot.set_transparency(0.3)
+    viewer = get_viewer()
+    set_camera_0()
 
     staircase = generate_staircase(
         radius=1.4,
