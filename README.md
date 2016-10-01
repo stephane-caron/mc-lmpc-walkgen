@@ -35,8 +35,8 @@ OpenRAVE](https://scaron.info/teaching/installing-openrave-on-ubuntu-14.04.html)
 do:
 
 ```bash
-sudo apt-get install cython python python-dev python-pip python-scipy
-sudo pip install pycddlib quadprog
+sudo apt-get install cython python python-dev python-pip python-scipy python-shapely
+sudo pip install pycddlib quadprog pyclipper
 ```
 
 Then, clone the repository and its submodule via:
