@@ -19,14 +19,14 @@ at marginal cost and directly applied in a model-predictive controller. We
 finally implement this pipeline and exemplify it with the HRP-4 humanoid model
 in multi-contact dynamically walking scenarios.
 
-<img src="https://scaron.info/images/humanoids-2016.png" height="250" />
+<img src="https://scaron.info/images/humanoids-2016.png" height="300" />
 
 Authors:
 [Stéphane Caron](https://scaron.info) and
 [Abderrahmane Kheddar](http://www.lirmm.fr/lirmm_eng/users/utilisateurs-lirmm/equipes/idh/abderrahmane-kheddar)
 
 - [Pre-print on HAL](https://hal.archives-ouvertes.fr/hal-01349880)
-- [Accompanying video](https://scaron.info/videos/pre-print-2016-1.mp4)
+- [Accompanying video](https://scaron.info/videos/humanoids-2016.mp4)
 
 ## Installation
 
