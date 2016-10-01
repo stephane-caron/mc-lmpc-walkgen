@@ -25,38 +25,32 @@ import sys
 import time
 import threading
 
+from numpy import arange, cos, hstack, pi, sin, zeros, array
+from numpy.random import random, seed
+
 try:
-    from pymanoid import init, draw_line, draw_points, get_gravity, get_viewer
-    from pymanoid import get_env
-    from pymanoid import draw_force, draw_polygon, Contact, PointMass
-    from pymanoid.tasks import ContactTask, DOFTask, LinkPoseTask, MinCAMTask
-    from pymanoid import set_camera_top, draw_point
-    from pymanoid.draw import draw_3d_cone, draw_polyhedron
+    import pymanoid
 except ImportError:
     script_path = os.path.realpath(__file__)
     sys.path.append(os.path.dirname(script_path) + '/../pymanoid')
-    from pymanoid import init, draw_line, draw_points, get_gravity, get_viewer
-    from pymanoid import get_env
-    from pymanoid import draw_force, draw_polygon, Contact, PointMass
-    from pymanoid.tasks import ContactTask, DOFTask, LinkPoseTask, MinCAMTask
-    from pymanoid import set_camera_top, draw_point
-    from pymanoid.draw import draw_3d_cone, draw_polyhedron
+    import pymanoid
+
+from pymanoid import Contact, PointMass
+from pymanoid import draw_line, draw_points, draw_force, draw_polygon
+from pymanoid import set_camera_top, draw_point
+from pymanoid.draw import draw_3d_cone, draw_polyhedron
+from pymanoid.tasks import ContactTask, DOFTask, LinkPoseTask, MinCAMTask
 
 try:
     from wpg.buffer import PreviewBuffer
-    from wpg.control import TubePreviewControl
-    from wpg.fsm import StateMachine
-    from wpg.simulation import Process, Simulation
 except ImportError:
     script_path = os.path.realpath(__file__)
     sys.path.append(os.path.dirname(script_path) + '/..')
     from wpg.buffer import PreviewBuffer
-    from wpg.control import TubePreviewControl
-    from wpg.fsm import StateMachine
-    from wpg.simulation import Process, Simulation
 
-from numpy import arange, cos, hstack, pi, sin, zeros, array
-from numpy.random import random, seed
+from wpg.control import TubePreviewControl
+from wpg.fsm import StateMachine
+from wpg.simulation import Process, Simulation
 
 try:
     from hrp4_pymanoid import HRP4 as RobotModel
@@ -127,7 +121,7 @@ def dash_graph_handles(handles):
 
 
 def set_camera_0():
-    get_viewer().SetCamera([
+    pymanoid.get_viewer().SetCamera([
         [0.97248388,  0.01229851, -0.23264533,  2.34433222],
         [0.21414823, -0.44041135,  0.87188209, -2.02105641],
         [-0.0917368, -0.89771186, -0.43092664,  3.40723848],
@@ -135,7 +129,7 @@ def set_camera_0():
 
 
 def set_camera_1():
-    get_viewer().SetCamera([
+    pymanoid.get_viewer().SetCamera([
         [1., 0.,  0., -7.74532557e-04],
         [0., 0.,  1., -4.99819374e+00],
         [0., -1., 0., 1.7],
@@ -171,7 +165,7 @@ class ForceDrawer(Process):
     def on_tick(self, sim):
         """Find supporting contact forces at each COM acceleration update."""
         comdd = preview_buffer.comdd
-        gravity = get_gravity()
+        gravity = pymanoid.get_gravity()
         wrench = hstack([robot_mass * (comdd - gravity), zeros(3)])
         support = fsm.cur_stance.find_supporting_forces(
             wrench, preview_buffer.com.p, robot_mass, 10.)
@@ -372,13 +366,13 @@ def suntan_hrp(ambient=0., diffuse=0.85):
 
 if __name__ == "__main__":
     seed(42)
-    init()
+    pymanoid.init(set_viewer=False)
     robot = RobotModel(download_if_needed=True)
     robot_mass = robot.mass  # saved here to avoid taking robot_lock
-    get_env().SetViewer('qtcoin')
-    robot.set_transparency(0.3)
-    viewer = get_viewer()
+    pymanoid.get_env().SetViewer('qtcoin')
+    viewer = pymanoid.get_viewer()
     set_camera_0()
+    robot.set_transparency(0.3)
 
     staircase = generate_staircase(
         radius=1.4,
