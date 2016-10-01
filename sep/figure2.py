@@ -188,14 +188,15 @@ def prepare_screenshot(ambient=0., diffuse=0.9):
 
 
 if __name__ == "__main__":
-    pymanoid.init()
-    viewer = pymanoid.get_env().GetViewer()
+    pymanoid.init(set_viewer=False)
+    robot = RobotModel(download_if_needed=True)
+    pymanoid.get_env().SetViewer('qtcoin')
+    viewer = pymanoid.get_viewer()
     viewer.SetCamera(array([
         [0.60587192, -0.36596244,  0.70639274, -2.4904027],
         [-0.79126787, -0.36933163,  0.48732874, -1.6965636],
         [0.08254916, -0.85420468, -0.51334199,  2.79584694],
         [0.,  0.,  0.,  1.]]))
-    robot = RobotModel(download_if_needed=True)
     robot.set_transparency(0.5)
 
     # contacts = pymanoid.ContactSet({
