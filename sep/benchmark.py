@@ -81,11 +81,9 @@ if __name__ == "__main__":
         exit(-1)
 
     pymanoid.init(show=False)
-    fname = sys.argv[1] if len(sys.argv) > 1 else 'stances/figure2-triple.json'
+    fname = sys.argv[1] if len(sys.argv) > 1 else '../stances/triple.json'
     contacts = pymanoid.ContactSet.from_json(fname)
     __w0 = compute_static_polygon_bretl  # W0611
     __w1 = compute_static_polygon_pyparma_hull  # W0611
-
-    for _ in xrange(10):
-        sample_contacts()
-        benchmark()
+    sample_contacts()
+    benchmark()

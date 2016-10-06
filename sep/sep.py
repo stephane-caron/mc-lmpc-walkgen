@@ -141,26 +141,26 @@ def draw_cdd_only_thread():
 
 if __name__ == "__main__":
     pymanoid.init()
+    robot = RobotModel(download_if_needed=True)
+    robot.set_transparency(0.2)
+    robot_mass = robot.mass
     viewer = pymanoid.get_env().GetViewer()
-    viewer.SetBkgndColor([.6, .6, .8])
     viewer.SetCamera(numpy.array([
         [0.60587192, -0.36596244,  0.70639274, -2.4904027],
         [-0.79126787, -0.36933163,  0.48732874, -1.6965636],
         [0.08254916, -0.85420468, -0.51334199,  2.79584694],
         [0.,  0.,  0.,  1.]]))
-    robot = RobotModel(download_if_needed=True)
-    robot.set_transparency(0.2)
-    robot_mass = robot.mass
+    viewer.SetBkgndColor([1, 1, 1])
 
-    fname = sys.argv[1] if len(sys.argv) > 1 else 'stances/figure2-triple.json'
+    fname = sys.argv[1] if len(sys.argv) > 1 else '../stances/triple.json'
     contacts = pymanoid.ContactSet.from_json(fname)
 
     com_target = pymanoid.Cube(0.01, visible=True)
     outbox = pymanoid.Cube(0.02, color='b')
 
-    if 'figure2-single.json' in fname:
+    if 'single.json' in fname:
         outbox.set_pos([0.,  0.,  z_high])
-    elif 'figure2-double.json' in fname or 'figure2-triple.json' in fname:
+    elif 'double.json' in fname or 'triple.json' in fname:
         outbox.set_pos([0.3,  0.04,  z_high])
     else:
         warn("Unknown contact set, you will have to set the COM position.")

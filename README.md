@@ -51,18 +51,15 @@ installed on your system, be sure that its version matches the one used by
 
 ## Usage
 
-There are three Python scripts you can run:
+There are three subfolders in this repository, corresponding to different
+Sections of the paper:
 
-- [staircase/walk.py](/staircase/walk.py) walks the humanoid model around a
-  circular staircase with tilted stepping stones. Supporting contact forces are
-  computed at each time instant: in case of failure, the skyblue background
-  becomes red. When supporting forces are found again, the red background takes
-  a "tainted" color between red and blue.
-- [sep/comparison.py](/sep/comparison.py) compares computation times for four
-  different algorithms calculating the static-equilibrium polygon (see the
-  Appendix of the paper). Requires [IPython](https://ipython.org/) in order to
-  use the ``%timeit`` function.
-- [sep/figure2.py](/sep/figure2.py) generates Figure 2 from the paper.
+- Section IV: [cones/](cones/) contains scripts to display and play with the COM
+  acceleration cones
+- Section VI: [staircase/](staircase/) walks the humanoid model around a
+  circular staircase with tilted stepping stones
+- Appendix: [sep/](sep/) compares four algorithms calculating the static-equilibrium
+  polygon
 
 Due to the copyright problem, we cannot release the COLLADA model ``HRP4R.dae``
 used to produce the accompanying video. We have replaced it with the

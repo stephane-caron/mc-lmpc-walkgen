@@ -23,7 +23,7 @@ import re
 import sys
 
 script_path = os.path.realpath(__file__)
-sys.path.append(os.path.dirname(script_path) + '/../../wpg')
+sys.path.append(os.path.dirname(script_path) + '/../wpg')
 
 from stats import AvgStdEstimator
 

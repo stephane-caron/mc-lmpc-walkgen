@@ -458,7 +458,7 @@ if __name__ == "__main__":
     left_foot_traj_drawer = TrajectoryDrawer(robot.left_foot, 'g-', lr=0)
     preview_drawer = PreviewDrawer()
     right_foot_traj_drawer = TrajectoryDrawer(robot.right_foot, 'r-', lr=1)
-    screenshot_taker = ScreenshotTaker()
+    # screenshot_taker = ScreenshotTaker()
     tube_drawer = TubeDrawer()
     sim.schedule_extra(com_traj_drawer)
     sim.schedule_extra(force_drawer)
