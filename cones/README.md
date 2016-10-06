@@ -12,4 +12,4 @@ contacts around using the OpenRAVE GUI (cones will be updated live).
   downward pointing as the point is repulsive. Move the green box around to see
   the link between VRP on feasible contact forces.
 
-<img src="illustration.png" height="300">
+<img src="illustration.png" height="350">
