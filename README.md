@@ -19,14 +19,11 @@ at marginal cost and directly applied in a model-predictive controller. We
 finally implement this pipeline and exemplify it with the HRP-4 humanoid model
 in multi-contact dynamically walking scenarios.
 
-<img src="https://scaron.info/images/humanoids-2016.png" height="300" />
+<img src="https://scaron.info/images/humanoids-2016.png" height="350" />
 
 Authors:
 [Stéphane Caron](https://scaron.info) and
 [Abderrahmane Kheddar](http://www.lirmm.fr/lirmm_eng/users/utilisateurs-lirmm/equipes/idh/abderrahmane-kheddar)
-
-- [Pre-print on HAL](https://hal.archives-ouvertes.fr/hal-01349880)
-- [Accompanying video](https://scaron.info/videos/humanoids-2016.mp4)
 
 ## Installation
 
@@ -54,14 +51,14 @@ installed on your system, be sure that its version matches the one used by
 There are three subfolders in this repository, corresponding to different
 Sections of the paper:
 
-- Section IV: [cones/](cones/) contains scripts to display and play with the COM
+- *Section IV*: [cones/](cones/) contains scripts to display and play with the COM
   acceleration cones
-- Section VI: [staircase/](staircase/) walks the humanoid model around a
+- *Section VI*: [staircase/](staircase/) walks the humanoid model around a
   circular staircase with tilted stepping stones
-- Appendix: [sep/](sep/) compares four algorithms calculating the static-equilibrium
+- *Appendix*: [sep/](sep/) compares four algorithms calculating the static-equilibrium
   polygon
 
 Due to the copyright problem, we cannot release the COLLADA model ``HRP4R.dae``
-used to produce the accompanying video. We have replaced it with the
-[JVRC-1](https://github.com/stephane-caron/openrave_models/tree/master/JVRC-1)
-model.
+used to produce the accompanying video and paper illustrations. We have replaced 
+it with [JVRC-1](https://github.com/stephane-caron/openrave_models/tree/master/JVRC-1),
+which has the same kinematic chain.
