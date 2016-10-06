@@ -10,7 +10,7 @@ directory contains two scripts:
 - Run [sep.py](sep.py) to show the SEPs computed by all methods. They should
   all coincidate.
 
-<img src="illustration.png" width="400">
+<img src="illustration.png" width="600">
 
 ## Installation
 
