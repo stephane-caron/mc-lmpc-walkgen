@@ -81,7 +81,7 @@ class PreviewControl(object):
         self.E = E
         self.G = G
         self.U_dim = u_dim * nb_steps
-        self.X_dim = x_dim * nb_steps
+        self.X_dim = x_dim * nb_steps  # not used but meh
         self.f = f
         self.h = h
         self.nb_steps = nb_steps

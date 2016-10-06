@@ -67,7 +67,7 @@ dt = 3e-2           # [s] simulation time step
 ds_duration = 0.5   # [s] duration of double-support phases
 nb_mpc_steps = 10   # discretization step of MPC controller
 ss_duration = 1.0   # [s] duration of single-support phases
-tube_radius = 0.03  # [m] radius in L1 norm
+tube_radius = 0.05  # [m] radius in L1 norm
 
 
 # Global variables
@@ -165,6 +165,7 @@ class ForceDrawer(Process):
     def __init__(self):
         self.last_bkgnd_switch = None
         self.handles = []
+        self.force_scale = 0.0025
 
     def on_tick(self, sim):
         """Find supporting contact forces at each COM acceleration update."""
@@ -178,7 +179,8 @@ class ForceDrawer(Process):
             viewer.SetBkgndColor([.8, .4, .4])
             self.last_bkgnd_switch = time.time()
         else:
-            self.handles = [draw_force(c, fc) for (c, fc) in support]
+            self.handles = [draw_force(c, fc, self.force_scale)
+                            for (c, fc) in support]
         if self.last_bkgnd_switch is not None \
                 and time.time() - self.last_bkgnd_switch > 0.2:
             # let's keep epilepsy at bay
@@ -452,16 +454,20 @@ if __name__ == "__main__":
     robot.start_ik_thread(dt)
 
     com_traj_drawer = TrajectoryDrawer(com, 'b-')
+    force_drawer = ForceDrawer()
     left_foot_traj_drawer = TrajectoryDrawer(robot.left_foot, 'g-', lr=0)
+    preview_drawer = PreviewDrawer()
     right_foot_traj_drawer = TrajectoryDrawer(robot.right_foot, 'r-', lr=1)
+    screenshot_taker = ScreenshotTaker()
+    tube_drawer = TubeDrawer()
     sim.schedule_extra(com_traj_drawer)
-    sim.schedule_extra(ForceDrawer())
+    sim.schedule_extra(force_drawer)
     sim.schedule_extra(left_foot_traj_drawer)
-    sim.schedule_extra(PreviewDrawer())
+    sim.schedule_extra(preview_drawer)
     sim.schedule_extra(right_foot_traj_drawer)
-    # sim.schedule_extra(ScreenshotTaker())
+    # sim.schedule_extra(screenshot_taker)
     # sim.schedule_extra(SEPDrawer())
-    sim.schedule_extra(TubeDrawer())
+    sim.schedule_extra(tube_drawer)
 
     set_camera_1()
     if True:
