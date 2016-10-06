@@ -44,9 +44,9 @@ from numpy import array, cross, dot, hstack, ones
 from polygon import compute_polygon_hull
 from polygon import draw_static_polygon
 
-try:
-    from hrp4_pymanoid import HRP4 as RobotModel
-except ImportError:
+if os.path.isfile('HRP4R.dae'):
+    from pymanoid.robots import HRP4 as RobotModel
+else:  # default to JVRC-1
     from pymanoid.robots import JVRC1 as RobotModel
 
 
@@ -150,7 +150,7 @@ def compute_acceleration_set(contact_set, p_com, display_scale=0.05):
 def draw_cone_thread():
     while True:
         try:
-            COMDD_K = 0.08
+            COMDD_K = 0.05
             vertices = compute_acceleration_set(contacts, com.p)
             vscale = [com_target.p + COMDD_K * array(v) for v in vertices]
             gui_handles['acc'] = pymanoid.draw_3d_cone(
