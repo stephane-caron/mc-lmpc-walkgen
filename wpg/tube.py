@@ -22,46 +22,17 @@ import pymanoid
 import time
 
 # from numpy import float64  # if using pyparma
-from numpy import array, cross, dot, hstack, ones, sqrt, vstack
+from numpy import array, cross, dot, hstack, ones, vstack
 from polygons import compute_polygon_hull, intersect_line_cylinder
-from pymanoid.polyhedra import Polytope
 from scipy.spatial.qhull import QhullError
+
+from polygons import intersect_polygons
+from pymanoid.misc import normalize
+from pymanoid.polyhedra import Polytope
 
 
 class TubeError(Exception):
     pass
-
-
-def normalize(v):
-    return v / sqrt(dot(v, v))
-
-
-from pyclipper import Pyclipper, PT_CLIP, PT_SUBJECT, CT_INTERSECTION
-from pyclipper import scale_to_clipper, scale_from_clipper
-
-
-def polygon_intersect(polygon1, polygon2):
-    """
-    Intersect two polygons.
-
-    INPUT:
-
-    - ``polygon1`` -- list of vertices in counterclockwise order
-    - ``polygon2`` -- same
-
-    OUTPUT:
-
-    Vertices of the intersection in counterclockwise order.
-    """
-    # could be accelerated by removing the scale_to/from_clipper()
-    subj, clip = (polygon1,), polygon2
-    pc = Pyclipper()
-    pc.AddPath(scale_to_clipper(clip), PT_CLIP)
-    pc.AddPaths(scale_to_clipper(subj), PT_SUBJECT)
-    solution = pc.Execute(CT_INTERSECTION)
-    if not solution:
-        return []
-    return scale_from_clipper(solution)[0]
 
 
 def reduce_polar_system(B, c):
@@ -96,6 +67,16 @@ def polar_to_polytope(vertices2d):
 
 class COMTube(object):
 
+    """
+    When there is an SS-to-DS contact switch, this strategy computes one primal
+    tube and two dual intersection cones.
+
+    The primal tube is, as described in the paper, a parallelepiped containing
+    both the COM current and target locations. Its dual cone is used during the
+    DS phase. The dual cone for the SS phase is calculated by intersecting the
+    latter with the dual cone of the current COM position in single-contact.
+    """
+
     def __init__(self, start_com, target_com, start_stance, next_stance, radius,
                  margin=0.01):
         """
@@ -110,37 +91,34 @@ class COMTube(object):
         - ``margin`` -- safety margin (in [m]) before/after start/end COM
                         positions (default: 1 [cm])
         """
+        self.comp_times = []
         self.dual_hrep = []
         self.dual_vrep = []
+        self.margin = margin
         self.next_stance = next_stance
         self.primal_hrep = []
         self.primal_vrep = []
         self.radius = radius
-        self.margin = margin
         self.start_com = start_com
         self.start_stance = start_stance
         self.target_com = target_com
-        #
-        self.comp_times = []
+        self.compute_double_description()
+
+    def compute_double_description(self):
+        """Compute primal and dual H-rep and V-reps."""
         t0 = time.time()
         self.compute_primal_vrep()
         t1 = time.time()
-        self.comp_times.append(t1 - t0)
-        t0 = t1
         self.compute_primal_hrep()
-        t1 = time.time()
-        self.comp_times.append(t1 - t0)
-        t0 = t1
+        t2 = time.time()
         self.compute_dual_vrep()
-        t1 = time.time()
-        self.comp_times.append(t1 - t0)
-        t0 = t1
+        t3 = time.time()
         self.compute_dual_hrep()
-        t1 = time.time()
-        self.comp_times.append(t1 - t0)
+        t4 = time.time()
+        self.comp_times = [t1 - t0, t2 - t1, t3 - t2, t4 - t3]
 
     def compute_primal_vrep(self):
-        # t0 = time.time()
+        """Compute vertices of the primal tube."""
         delta = self.target_com - self.start_com
         n = normalize(delta)
         t = array([0., 0., 1.])
@@ -169,25 +147,27 @@ class COMTube(object):
             self.primal_vrep = [
                 vertices,             # double-support
                 [self.target_com]]    # final single-support
-        # print "compute_primal_vrep(): %.1f ms" % (1000. * (time.time() - t0))
 
     def compute_primal_hrep(self):
-        # t0 = time.time()
+        """
+        Compute halfspaces of the primal tube.
+
+        NB: not optimized, we simply call cdd here.
+        """
         try:
             self.full_hrep = (Polytope.hrep(self.full_vrep))
         except RuntimeError as e:
             raise TubeError("Could not compute primal hrep: %s" % str(e))
-        # print "compute_primal_hrep(): %.1f ms" % (1000. * (time.time() - t0))
 
     def compute_dual_vrep(self):
-        # t0 = time.time()
+        """Compute vertices of the dual cones."""
         gravity = pymanoid.get_gravity()
 
-        def compute(stance_id, vertices):
+        def compute_stance_dual(stance_id, primal_vertices):
             stance = self.start_stance if stance_id == 0 else self.next_stance
             A_O = stance.cwc
             B_list, c_list = [], []
-            for (i, v) in enumerate(vertices):
+            for (i, v) in enumerate(primal_vertices):
                 B = A_O[:, :3] + cross(A_O[:, 3:], v)
                 c = dot(B, gravity)
                 B_list.append(B)
@@ -200,35 +180,41 @@ class COMTube(object):
                 raise TubeError("Cannot reduce polar of stance %d" % stance_id)
 
         if len(self.primal_vrep) == 1:
-            vertices = compute(0, self.primal_vrep[0])
+            vertices = compute_stance_dual(0, self.primal_vrep[0])
             self.dual_vrep = [polar_to_polytope(vertices)]
         else:  # len(self.primal_vrep) == 2
             ss_id, ds_id = (1, 0) if len(self.primal_vrep[0]) > 1 else (0, 1)
-            ds_vertices = compute(ds_id, self.full_vrep)
-            ss_vertices = compute(ss_id, self.primal_vrep[ss_id])
-            ss_vertices = polygon_intersect(ds_vertices, ss_vertices)
+            ds_vertices = compute_stance_dual(ds_id, self.full_vrep)
+            ss_vertices = compute_stance_dual(ss_id, self.primal_vrep[ss_id])
+            ss_vertices = intersect_polygons(ds_vertices, ss_vertices)
             self.dual_vrep = [
                 polar_to_polytope(ss_vertices),
                 polar_to_polytope(ds_vertices)]
             if ss_id == 1:
                 self.dual_vrep.reverse()
 
-        # print "compute_dual_vrep(): %.1f ms" % (1000. * (time.time() - t0))
-
     def compute_dual_hrep(self):
-        # t0 = time.time()
+        """
+        Compute halfspaces of the dual cones.
+
+        NB: not optimized, we simply call cdd here.
+        """
         for (stance_id, cone_vertices) in enumerate(self.dual_vrep):
-            # cone_vertices = self.compute_dual_vrep(stance_id)
             B, c = Polytope.hrep(cone_vertices)
             # B, c = (B.astype(float64), c.astype(float64))  # if using pyparma
             self.dual_hrep.append((B, c))
-        # print "compute_dual_hrep(): %.1f ms" % (1000. * (time.time() - t0))
 
 
 class DoubleCOMTube(COMTube):
 
+    """
+    In this strategy, two eight-vertex tubes are computed: the double-support
+    one is the same as in COMTube, while the single-support one is equal to the
+    intersection of the latter with the static-equilibrium cylinder.
+    """
+
     def compute_primal_vrep(self):
-        # t0 = time.time()
+        """Compute vertices for both primal tubes."""
         delta = self.target_com - self.start_com
         n = normalize(delta)
         t = array([0., 0., 1.])
@@ -264,8 +250,6 @@ class DoubleCOMTube(COMTube):
                 else:  # self.start_stance.is_double_support
                     # we are in DS but polytope is included in the next SS-SEP
                     self.primal_vrep = [vertices, vertices]
-                # print "compute_primal_vrep(): %.1f ms" % ( 1000. *
-                # (time.time() - t0))
                 return
             if self.start_stance.is_single_support:
                 mid_vertex = start_vertex + 0.95 * (mid_vertex - start_vertex)
@@ -280,19 +264,27 @@ class DoubleCOMTube(COMTube):
                 vertices1.append(mid_vertex)
                 vertices1.append(end_vertex)
         self.primal_vrep = [vertices0, vertices1]
-        # print "compute_primal_vrep(): %.1f ms" % (1000. * (time.time() - t0))
 
     def compute_primal_hrep(self):
-        # t0 = time.time()
+        """
+        Compute halfspaces of the primal tubes (contrary to COMTube, there are
+        two tubes here).
+
+        NB: not optimized, we simply call cdd here.
+        """
         for (stance_id, vertices) in enumerate(self.primal_vrep):
             try:
                 self.primal_hrep.append(Polytope.hrep(vertices))
             except RuntimeError as e:
                 raise TubeError("Could not compute primal hrep: %s" % str(e))
-        # print "compute_primal_hrep(): %.1f ms" % (1000. * (time.time() - t0))
 
     def compute_dual_vrep(self):
-        # t0 = time.time()
+        """
+        Compute vertices of the dual cone for each primal tube.
+
+        NB: the two tubes can have shared vertices at which dual-cone
+        computations can be factored. We don't implement this optimization here.
+        """
         gravity = pymanoid.get_gravity()
         for (stance_id, vertices) in enumerate(self.primal_vrep):
             if stance_id == 0:
@@ -313,4 +305,3 @@ class DoubleCOMTube(COMTube):
                 self.dual_vrep.append(cone_vertices)
             except QhullError:
                 raise TubeError("Cannot reduce polar of stance %d" % stance_id)
-        # print "compute_dual_vrep(): %.1f ms" % (1000. * (time.time() - t0))

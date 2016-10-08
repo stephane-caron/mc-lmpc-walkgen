@@ -37,7 +37,7 @@ except ImportError:
 
 from pymanoid import Contact, PointMass
 from pymanoid import draw_line, draw_points, draw_force, draw_polygon
-from pymanoid import set_camera_top, draw_point
+from pymanoid import draw_point
 from pymanoid.draw import draw_3d_cone, draw_polyhedron
 from pymanoid.tasks import ContactTask, DOFTask, LinkPoseTask, MinCAMTask
 
@@ -456,6 +456,7 @@ if __name__ == "__main__":
     preview_drawer = PreviewDrawer()
     right_foot_traj_drawer = TrajectoryDrawer(robot.right_foot, 'r-', lr=1)
     # screenshot_taker = ScreenshotTaker()
+    sep_drawer = SEPDrawer()
     tube_drawer = TubeDrawer()
     sim.schedule_extra(com_traj_drawer)
     sim.schedule_extra(force_drawer)
@@ -463,7 +464,7 @@ if __name__ == "__main__":
     sim.schedule_extra(preview_drawer)
     sim.schedule_extra(right_foot_traj_drawer)
     # sim.schedule_extra(screenshot_taker)
-    # sim.schedule_extra(SEPDrawer())
+    sim.schedule_extra(sep_drawer)
     sim.schedule_extra(tube_drawer)
 
     set_camera_1()

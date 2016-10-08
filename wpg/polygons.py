@@ -20,6 +20,8 @@
 
 from __future__ import division
 from numpy import array, dot, hstack, sqrt
+from pyclipper import Pyclipper, PT_CLIP, PT_SUBJECT, CT_INTERSECTION
+from pyclipper import scale_to_clipper, scale_from_clipper
 from scipy.spatial import ConvexHull
 from shapely.geometry import LineString as ShapelyLineString
 from shapely.geometry import Polygon as ShapelyPolygon
@@ -205,3 +207,27 @@ def intersect_line_cylinder(p1, p2, points):
     alpha = norm(p - p1[:2]) / norm(p2[:2] - p1[:2])
     z = p1[2] + alpha * (p2[2] - p1[2])
     return array([p[0], p[1], z])
+
+
+def intersect_polygons(polygon1, polygon2):
+    """
+    Intersect two polygons.
+
+    INPUT:
+
+    - ``polygon1`` -- list of vertices in counterclockwise order
+    - ``polygon2`` -- same
+
+    OUTPUT:
+
+    Vertices of the intersection in counterclockwise order.
+    """
+    # could be accelerated by removing the scale_to/from_clipper()
+    subj, clip = (polygon1,), polygon2
+    pc = Pyclipper()
+    pc.AddPath(scale_to_clipper(clip), PT_CLIP)
+    pc.AddPaths(scale_to_clipper(subj), PT_SUBJECT)
+    solution = pc.Execute(CT_INTERSECTION)
+    if not solution:
+        return []
+    return scale_from_clipper(solution)[0]
