@@ -18,9 +18,12 @@
 # You should have received a copy of the GNU General Public License along with
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
-import IPython
 import os
 import sys
+import timeit
+
+from numpy import pi
+from numpy.random import random
 
 try:
     import pymanoid
@@ -29,61 +32,101 @@ except ImportError:
     sys.path.append(os.path.dirname(script_path) + '/../pymanoid')
     import pymanoid
 
-from numpy import pi
-from numpy.random import random
+script_path = os.path.realpath(__file__)
+sys.path.append(os.path.dirname(script_path) + '/../wpg')
+
+from polygon import compute_static_polygon_cdd_hull
+from stats import AvgStdEstimator
+
+
+nb_contact_sets = 100
+robot_mass = 39.  # [kg]
+
+function_calls = [
+    'compute_static_polygon_cdd_hull(contacts)',
+    'compute_static_polygon_hull_only(A_O)',
+    'compute_static_polygon_pyparma_hull(contacts)',
+    'compute_static_polygon_bretl(contacts, solver="glpk")',
+    # 'compute_static_polygon_bretl(contacts, solver=None)',
+    'compute_static_polygon_cdd_only(contacts, robot_mass)']
+
+setup = """
 from polygon import compute_static_polygon_bretl
 from polygon import compute_static_polygon_cdd_hull
-from polygon import compute_static_polygon_pyparma_hull
+from polygon import compute_static_polygon_hull_only
 from polygon import compute_static_polygon_cdd_only
+from polygon import compute_static_polygon_pyparma_hull
+from __main__ import contacts, robot_mass, A_O
+"""
+
+results = {f: AvgStdEstimator() for f in function_calls}
+outliers = {}
 
 
-black = (0., 0., 0., 0.5)
-cyan = (0., 0.5, 0.5, 0.5)
-dt = 3e-2  # [s]
-green = (0., 0.5, 0., 0.5)
-magenta = (0.5, 0., 0.5, 0.5)
-robot_mass = 39  # [kg], updated once robot model is loaded
-yellow = (0.5, 0.5, 0., 0.5)
-
-
-def benchmark():
-    # first, we call this one once as it will round contacts RPY
-    compute_static_polygon_cdd_only(contacts, robot_mass)
-    print ""
-    print "Benchmarking computation times"
-    print "------------------------------"
-    function_calls = ['compute_static_polygon_cdd_hull(contacts)',
-                      'compute_static_polygon_pyparma_hull(contacts)',
-                      'compute_static_polygon_bretl(contacts, solver="glpk")',
-                      'compute_static_polygon_bretl(contacts, solver=None)',
-                      'compute_static_polygon_cdd_only(contacts, robot_mass)']
+def benchmark_contacts(nb_iter=10):
+    """Run all methods for the current contact set."""
+    global outliers
+    times = {}
     for call in function_calls:
-        print "\n%%timeit %s" % call,
-        for _ in xrange(1):
-            IPython.get_ipython().magic(u'timeit %s' % call)
+        try:
+            timer = timeit.Timer(call, setup=setup)
+            time_ms = 1000. * min(timer.repeat(3, nb_iter)) / nb_iter
+            times[call] = time_ms
+        except Exception as e:
+            print "Exception:", e
+    output = results
+    if len(times) < len(function_calls):
+        if not outliers:
+            outliers = {f: AvgStdEstimator() for f in function_calls}
+        output = outliers
+    for call in function_calls:
+        if call in times:
+            output[call].add(times[call])
 
 
 def sample_contacts():
-    for c in contacts.contacts:
-        c.set_pos(1. * (2. * random(3) - 1.))
-        c.set_rpy(pi / 2. * (2. * random(3) - 1.))
-    try:
-        # check that polygon contains the origin:
-        compute_static_polygon_cdd_hull(contacts)
-    except:
-        return sample_contacts()
+    """Sample a new contact set."""
+    found = False
+    while not found:
+        for c in contacts.contacts:
+            c.set_pos(1. * (2. * random(3) - 1.))
+            c.set_rpy(pi / 2. * (2. * random(3) - 1.))
+        try:
+            # check that polygon contains the origin:
+            compute_static_polygon_cdd_hull(contacts)
+            found = True
+        except:
+            pass
+
+
+def print_results(d):
+    for call, estimator in d.iteritems():
+        avg, std, n = estimator.get_all()
+        if n > 0:
+            print "%s:\t%.2f +/- %.2f (%d samples)" % (call, avg, std, n)
 
 
 if __name__ == "__main__":
-    if IPython.get_ipython() is None:
-        # we use IPython (in interactive mode) for the %timeit function
-        print "Usage: ipython -i %s" % os.path.basename(__file__)
-        exit(-1)
-
-    pymanoid.init(show=False)
-    fname = sys.argv[1] if len(sys.argv) > 1 else '../stances/triple.json'
+    if len(sys.argv) < 2 or sys.argv[1] not in ['single', 'double', 'triple']:
+        print "Usage: %s <single|double|triple> [nb_contact_sets]" % sys.argv[0]
+        sys.exit(-1)
+    if len(sys.argv) > 2:
+        nb_contact_sets = int(sys.argv[2])
+    pymanoid.init(set_viewer=False)
+    size = sys.argv[1]
+    if size == 'triple':
+        function_calls.pop()  # don't do cdd_only for > 2 contacts
+    fname = '../stances/%s.json' % size
     contacts = pymanoid.ContactSet.from_json(fname)
-    __w0 = compute_static_polygon_bretl  # W0611
-    __w1 = compute_static_polygon_pyparma_hull  # W0611
-    sample_contacts()
-    benchmark()
+    for i in xrange(nb_contact_sets):
+        print "Contact set %d / %d..." % (i + 1, nb_contact_sets)
+        sample_contacts()
+        A_O = contacts.compute_wrench_cone([0, 0, 0])
+        benchmark_contacts()
+    print "\nRESULTS"
+    print "=======\n"
+    print_results(results)
+    if outliers:
+        print "\nOUTLIERS"
+        print "========\n"
+        print_results(outliers)

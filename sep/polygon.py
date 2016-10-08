@@ -69,6 +69,12 @@ def compute_static_polygon_cdd_hull(contact_set, p=[0, 0, 0]):
     return compute_polygon_hull(B, c)
 
 
+def compute_static_polygon_hull_only(A_O, p=[0, 0, 0]):
+    k, a_Oz, a_x, a_y = A_O.shape[0], A_O[:, 2], A_O[:, 3], A_O[:, 4]
+    B, c = hstack([-a_y.reshape((k, 1)), +a_x.reshape((k, 1))]), -a_Oz
+    return compute_polygon_hull(B, c)
+
+
 def compute_static_polygon_pyparma_hull(contact_set, p=[0, 0, 0]):
     A_O = compute_cwc_pyparma(contact_set, p)
     k, a_Oz, a_x, a_y = A_O.shape[0], A_O[:, 2], A_O[:, 3], A_O[:, 4]
