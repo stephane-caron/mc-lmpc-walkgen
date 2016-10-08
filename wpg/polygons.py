@@ -19,28 +19,29 @@
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import division
-from numpy import array, dot, hstack, sqrt
+
+from numpy import array, dot, hstack
 from pyclipper import Pyclipper, PT_CLIP, PT_SUBJECT, CT_INTERSECTION
 from pyclipper import scale_to_clipper, scale_from_clipper
 from scipy.spatial import ConvexHull
 from shapely.geometry import LineString as ShapelyLineString
 from shapely.geometry import Polygon as ShapelyPolygon
 
+from pymanoid.misc import norm
+from pymanoid.polyhedra import Polytope
 
-def norm(v):
-    return sqrt(dot(v, v))
 
-
-def compute_polygon_hull(B, c):
+def __compute_polygon_hull(B, c):
     """
     Compute the vertex representation of a polygon defined by:
 
         B * x <= c
 
-    where x is a 2D vector. The origin [0, 0] should lie inside the polygon (c
-    >= 0) in order to build the polar form. This case can always be reached if
-    there is a solution by translating to an interior point of the polygon.
-    (This function will not compute the interior point automatically.)
+    where x is a 2D vector.
+
+    NB: the origin [0, 0] should lie inside the polygon (c >= 0) in order to
+    build the polar form. If you don't have this guarantee, call
+    compute_polygon_hull() instead.
 
     INPUT:
 
@@ -88,6 +89,33 @@ def compute_polygon_hull(B, c):
                  for i in xrange(len(hull.vertices) - 1)]
     simplices.append((hull.vertices[-1], hull.vertices[0]))
     vertices = [axis_intersection(i, j) for (i, j) in simplices]
+    return vertices
+
+
+def compute_polygon_hull(B, c):
+    """
+    Compute the vertex representation of a polygon defined by:
+
+        B * x <= c
+
+    where x is a 2D vector.
+
+    INPUT:
+
+    - ``B`` -- (2 x K) matrix
+    - ``c`` -- vector of length K and positive coordinates
+
+    OUTPUT:
+
+    List of 2D vertices in counterclowise order.
+    """
+    x = None
+    if not all(c > 0):
+        x = Polytope.compute_chebyshev_center(B, c)
+        c = c - dot(B, x)
+    vertices = __compute_polygon_hull(B, c)
+    if x is not None:
+        vertices = [v + x for v in vertices]
     return vertices
 
 

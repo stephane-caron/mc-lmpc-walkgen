@@ -22,7 +22,7 @@ import pymanoid
 import time
 
 # from numpy import float64  # if using pyparma
-from numpy import array, cross, dot, hstack, ones, vstack
+from numpy import array, cross, dot, hstack, vstack
 from polygons import compute_polygon_hull, intersect_line_cylinder
 from scipy.spatial.qhull import QhullError
 
@@ -35,34 +35,28 @@ class TubeError(Exception):
     pass
 
 
-def reduce_polar_system(B, c):
-    gravity = pymanoid.get_gravity()
-    g = -gravity[2]
-    assert g > 0
-    # assert all(c > 0), "c > 0 assertion failed"
-    # assert all(B[:, 2] < 0)
-    assert all(abs(c) > 1e-10)
+def compute_dual_vertices_2d(B, c):
+    g = -pymanoid.get_gravity()[2]
     check = c / B[:, 2]
     assert max(check) - min(check) < 1e-10, "max - min failed (%.1e)" % (
         (max(check) - min(check)))
     assert abs(check[0] - (-g)) < 1e-10, "check is not -g?"
-    sigma = c / g
-    B2 = hstack([
-        (B[:, column] / sigma).reshape((B.shape[0], 1))
-        for column in [0, 1]])
-
-    return compute_polygon_hull(B2, ones(len(c)))
+    B_2d = hstack([B[:, column].reshape((B.shape[0], 1)) for column in [0, 1]])
+    sigma = c / g  # algebraic distances to SEP (see paper for details)
+    return compute_polygon_hull(B_2d, sigma)
 
 
-def polar_to_polytope(vertices2d):
-    gravity = pymanoid.get_gravity()
-    g = -gravity[2]
+def get_dual_vertices_3d(vertices_2d, z=None):
+    g = -pymanoid.get_gravity()[2]
+    z = +g if z is None else z
+    v = [array([a * (g + z), b * (g + z)]) for (a, b) in vertices_2d]
+    vertices_at_z = [array([x, y, z]) for (x, y) in v]
+    return [array([0, 0, -g])] + vertices_at_z
 
-    def vertices_at(z):
-        v = [array([a * (g + z), b * (g + z)]) for (a, b) in vertices2d]
-        return [array([x, y, z]) for (x, y) in v]
 
-    return [array([0, 0, -g])] + vertices_at(z=+g)
+def compute_dual_vertices(B, c, z=None):
+    vertices_2d = compute_dual_vertices_2d(B, c)
+    return get_dual_vertices_3d(vertices_2d, z)
 
 
 class COMTube(object):
@@ -163,7 +157,7 @@ class COMTube(object):
         """Compute vertices of the dual cones."""
         gravity = pymanoid.get_gravity()
 
-        def compute_stance_dual(stance_id, primal_vertices):
+        def compute_stance_v2d(stance_id, primal_vertices):
             stance = self.start_stance if stance_id == 0 else self.next_stance
             A_O = stance.cwc
             B_list, c_list = [], []
@@ -175,23 +169,24 @@ class COMTube(object):
             B = vstack(B_list)
             c = hstack(c_list)
             try:
-                return reduce_polar_system(B, c)
+                return compute_dual_vertices_2d(B, c)
             except QhullError:
                 raise TubeError("Cannot reduce polar of stance %d" % stance_id)
 
         if len(self.primal_vrep) == 1:
-            vertices = compute_stance_dual(0, self.primal_vrep[0])
-            self.dual_vrep = [polar_to_polytope(vertices)]
+            vertices_2d = compute_stance_v2d(0, self.primal_vrep[0])
+            self.dual_vrep = [get_dual_vertices_3d(vertices_2d)]
         else:  # len(self.primal_vrep) == 2
             ss_id, ds_id = (1, 0) if len(self.primal_vrep[0]) > 1 else (0, 1)
-            ds_vertices = compute_stance_dual(ds_id, self.full_vrep)
-            ss_vertices = compute_stance_dual(ss_id, self.primal_vrep[ss_id])
-            ss_vertices = intersect_polygons(ds_vertices, ss_vertices)
-            self.dual_vrep = [
-                polar_to_polytope(ss_vertices),
-                polar_to_polytope(ds_vertices)]
-            if ss_id == 1:
-                self.dual_vrep.reverse()
+            ds_vertices_2d = compute_stance_v2d(ds_id, self.full_vrep)
+            ss_vertices_2d = compute_stance_v2d(ss_id, self.primal_vrep[ss_id])
+            ss_vertices_2d = intersect_polygons(ds_vertices_2d, ss_vertices_2d)
+            ds_vertices = get_dual_vertices_3d(ds_vertices_2d)
+            ss_vertices = get_dual_vertices_3d(ss_vertices_2d)
+            if ss_id == 0:
+                self.dual_vrep = [ss_vertices, ds_vertices]
+            else:  # ss_id == 1
+                self.dual_vrep = [ds_vertices, ss_vertices]
 
     def compute_dual_hrep(self):
         """
@@ -300,8 +295,7 @@ class DoubleCOMTube(COMTube):
             B = vstack(B_list)
             c = hstack(c_list)
             try:
-                vertices2d = reduce_polar_system(B, c)
-                cone_vertices = polar_to_polytope(vertices2d)
+                cone_vertices = compute_dual_vertices(B, c)
                 self.dual_vrep.append(cone_vertices)
             except QhullError:
                 raise TubeError("Cannot reduce polar of stance %d" % stance_id)
