@@ -1,4 +1,4 @@
-# Multi-contact Walking Pattern Generation based on Model Preview Control of 3D COM Accelerations
+# 3D-COM MPC
 
 Source code for https://hal.archives-ouvertes.fr/hal-01349880
 
