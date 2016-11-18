@@ -1,6 +1,8 @@
 # 3D-COM MPC
 
-Source code for https://hal.archives-ouvertes.fr/hal-01349880
+Source code for *Multi-contact Walking Pattern Generation based on Model
+Preview Control of 3D COM Accelerations* (Humanoids 2016,
+[pdf](https://hal.archives-ouvertes.fr/hal-01349880)).
 
 ## Abstract
 
@@ -62,3 +64,7 @@ Due to the copyright problem, we cannot release the COLLADA model ``HRP4R.dae``
 used to produce the accompanying video and paper illustrations. We have replaced 
 it with [JVRC-1](https://github.com/stephane-caron/openrave_models/tree/master/JVRC-1),
 which has the same kinematic chain.
+
+## Questions?
+
+Feel free to post your questions or comments in the issue tracker.
