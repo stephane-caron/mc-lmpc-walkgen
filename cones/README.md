@@ -12,4 +12,7 @@ contacts around using the OpenRAVE GUI (cones will be updated live).
   downward pointing as the point is repulsive. Move the green box around to see
   the link between VRP on feasible contact forces.
 
+Note that both cones are derived in the Pendulum Mode of the equations of
+motion, where the angular momentum at the center-of-mass is kept constant.
+
 <img src="illustration.png" height="350">
