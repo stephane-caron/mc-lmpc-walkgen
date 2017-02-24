@@ -1,8 +1,6 @@
 # 3D-COM MPC
 
-Source code for *Multi-contact Walking Pattern Generation based on Model
-Preview Control of 3D COM Accelerations* (Humanoids 2016,
-[pdf](https://hal.archives-ouvertes.fr/hal-01349880)).
+Source code for https://hal.archives-ouvertes.fr/hal-01349880
 
 ## Abstract
 
