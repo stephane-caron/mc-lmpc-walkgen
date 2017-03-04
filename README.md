@@ -39,12 +39,12 @@ sudo pip install pycddlib quadprog pyclipper
 Then, clone the repository and its submodule via:
 
 ```bash
-git clone --recursive https://github.com/stephane-caron/3d-mpc.git
+git clone --recursive https://github.com/stephane-caron/3d-com-mpc.git
 ```
 
 If you already have [pymanoid](https://github.com/stephane-caron/pymanoid)
-installed on your system, be sure that its version matches the one used by
-``3d-mpc``.
+installed on your system, be sure that its version matches that of the
+submodule.
 
 ## Usage
 
