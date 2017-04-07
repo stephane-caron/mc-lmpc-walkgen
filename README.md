@@ -49,8 +49,10 @@ submodule.
 ## Usage
 
 The ``walk.sh`` script from the top-level directory opens the staircase
-simulation. For a more detailed analysis, there are three subfolders in this
-repository, corresponding to different Sections of the paper:
+simulation.
+
+For a more detailed analysis, there are three subfolders in this repository,
+corresponding to different Sections of the paper:
 
 - *Section IV*: [cones/](cones/) contains scripts to display and play with the COM
   acceleration cones
