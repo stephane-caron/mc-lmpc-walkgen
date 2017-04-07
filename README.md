@@ -48,8 +48,10 @@ submodule.
 
 ## Usage
 
-There are three subfolders in this repository, corresponding to different
-Sections of the paper:
+Run ``walk.sh`` to open the staircase simulation directly.
+
+For a more detailed analysis, there are three subfolders in this repository,
+corresponding to different Sections of the paper:
 
 - *Section IV*: [cones/](cones/) contains scripts to display and play with the COM
   acceleration cones
@@ -59,8 +61,9 @@ Sections of the paper:
   polygon
 
 Due to the copyright problem, we cannot release the COLLADA model ``HRP4R.dae``
-used to produce the accompanying video and paper illustrations. We have replaced 
-it with [JVRC-1](https://github.com/stephane-caron/openrave_models/tree/master/JVRC-1),
+used to produce the accompanying video and paper illustrations. We have
+replaced it with
+[JVRC-1](https://github.com/stephane-caron/openrave_models/tree/master/JVRC-1),
 which has the same kinematic chain.
 
 ## Questions?
