@@ -48,7 +48,7 @@ submodule.
 
 ## Usage
 
-Run ``walk.sh`` to open the staircase simulation directly.
+You can run ``walk.sh`` to open the staircase simulation directly.
 
 For a more detailed analysis, there are three subfolders in this repository,
 corresponding to different Sections of the paper:
