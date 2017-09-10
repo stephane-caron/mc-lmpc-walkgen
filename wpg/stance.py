@@ -18,23 +18,15 @@
 # You should have received a copy of the GNU General Public License along with
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
-import os
-import sys
-
 from numpy import dot
 
-try:  # use local pymanoid submodule
-    script_path = os.path.realpath(__file__)
-    sys.path = [os.path.dirname(script_path) + '/../pymanoid'] + sys.path
-    from pymanoid import ContactSet
-    from pymanoid.polyhedra import Polytope
+from pymanoid import ContactSet
+from pymanoid.polyhedra import Polytope
 
-    try:
-        from hrp4_pymanoid import HRP4 as RobotModel
-    except ImportError:
-        from pymanoid.robots import JVRC1 as RobotModel
-except:  # this is to avoid warning E402 from Pylint
-    pass
+try:
+    from hrp4_pymanoid import HRP4 as RobotModel
+except ImportError:
+    from pymanoid.robots import JVRC1 as RobotModel
 
 
 class Stance(ContactSet):

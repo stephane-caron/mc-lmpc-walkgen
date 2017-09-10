@@ -20,9 +20,6 @@
 
 from __future__ import division
 
-import os
-import sys
-
 from numpy import array, dot, hstack
 from pyclipper import Pyclipper, PT_CLIP, PT_SUBJECT, CT_INTERSECTION
 from pyclipper import scale_to_clipper, scale_from_clipper
@@ -30,13 +27,8 @@ from scipy.spatial import ConvexHull
 from shapely.geometry import LineString as ShapelyLineString
 from shapely.geometry import Polygon as ShapelyPolygon
 
-try:  # use local pymanoid submodule
-    script_path = os.path.realpath(__file__)
-    sys.path = [os.path.dirname(script_path) + '/../pymanoid'] + sys.path
-    from pymanoid.misc import norm
-    from pymanoid.polyhedra import Polytope
-except:  # this is to avoid warning E402 from Pylint
-    pass
+from pymanoid.misc import norm
+from pymanoid.polyhedra import Polytope
 
 
 def __compute_polygon_hull(B, c):

@@ -18,20 +18,13 @@
 # You should have received a copy of the GNU General Public License along with
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
-import os
-import sys
 import time
 
 # from numpy import float64  # if using pyparma
 from numpy import array, cross, dot, hstack, vstack
 from scipy.spatial.qhull import QhullError
 
-try:  # use local pymanoid submodule
-    script_path = os.path.realpath(__file__)
-    sys.path = [os.path.dirname(script_path) + '/../pymanoid'] + sys.path
-    import pymanoid
-except:  # this is to avoid warning E402 from Pylint
-    pass
+import pymanoid
 
 from polygons import compute_polygon_hull, intersect_line_cylinder
 from polygons import intersect_polygons
