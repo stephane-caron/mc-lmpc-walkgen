@@ -18,12 +18,21 @@
 # You should have received a copy of the GNU General Public License along with
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
+import os
+import sys
 import time
 
 from logging import warning
 from numpy import array, bmat, dot, eye, hstack, sqrt, vstack, zeros
-from pymanoid import PointMass, solve_qp
 from scipy.linalg import block_diag
+
+try:  # use local pymanoid submodule
+    script_path = os.path.realpath(__file__)
+    sys.path = [os.path.dirname(script_path) + '/../pymanoid'] + sys.path
+    from pymanoid import PointMass, solve_qp
+except:  # this is to avoid warning E402 from Pylint
+    pass
+
 from simulation import Process
 from tube import COMTube, TubeError
 

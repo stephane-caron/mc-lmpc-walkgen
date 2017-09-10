@@ -18,15 +18,23 @@
 # You should have received a copy of the GNU General Public License along with
 # 3d-mpc. If not, see <http://www.gnu.org/licenses/>.
 
-# from cwc import compute_cwc_pyparma
-from numpy import dot
-from pymanoid import ContactSet
-from pymanoid.polyhedra import Polytope
+import os
+import sys
 
-try:
-    from hrp4_pymanoid import HRP4 as RobotModel
-except ImportError:
-    from pymanoid.robots import JVRC1 as RobotModel
+from numpy import dot
+
+try:  # use local pymanoid submodule
+    script_path = os.path.realpath(__file__)
+    sys.path = [os.path.dirname(script_path) + '/../pymanoid'] + sys.path
+    from pymanoid import ContactSet
+    from pymanoid.polyhedra import Polytope
+
+    try:
+        from hrp4_pymanoid import HRP4 as RobotModel
+    except ImportError:
+        from pymanoid.robots import JVRC1 as RobotModel
+except:  # this is to avoid warning E402 from Pylint
+    pass
 
 
 class Stance(ContactSet):
@@ -62,7 +70,7 @@ class Stance(ContactSet):
     def compute_stability_criteria(self):
         self.cwc = self.compute_wrench_cone([0, 0, 0])  # calls cdd
         # self.cwc = compute_cwc_pyparma(self, [0, 0, 0])
-        m = RobotModel.mass  # however, the SEP does not depend on this
+        # m = RobotModel.mass  # however, the SEP does not depend on this
         self.sep = self.compute_static_equilibrium_polygon()
         self.sep_hrep = Polytope.hrep(self.sep)
 
