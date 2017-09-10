@@ -26,13 +26,14 @@ import time
 
 from numpy import array, cross, dot, hstack, ones
 
-try:
-    import pymanoid
-except ImportError:
+try:  # use local pymanoid submodule
     script_path = os.path.realpath(__file__)
-    sys.path.append(os.path.dirname(script_path) + '/../pymanoid')
+    sys.path = [os.path.dirname(script_path) + '/../pymanoid'] + sys.path
     import pymanoid
-    from pymanoid.tasks import COMTask
+except:  # this is to avoid warning E402 from Pylint
+    pass
+
+from pymanoid.tasks import COMTask
 
 try:
     from wpg.cwc import compute_cwc_pyparma
@@ -144,7 +145,6 @@ if __name__ == "__main__":
         [-0.79126787, -0.36933163,  0.48732874, -1.6965636],
         [0.08254916, -0.85420468, -0.51334199,  2.79584694],
         [0.,  0.,  0.,  1.]]))
-    robot.set_transparency(0.5)
     robot_mass = robot.mass
 
     fname = sys.argv[1] if len(sys.argv) > 1 else '../stances/double.json'

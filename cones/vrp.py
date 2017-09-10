@@ -22,18 +22,18 @@ import IPython
 import os.path
 import sys
 import thread
-import threading
 import time
 
 from numpy import array, cross, dot, hstack, ones, zeros
 
-try:
-    import pymanoid
-except ImportError:
+try:  # use local pymanoid submodule
     script_path = os.path.realpath(__file__)
-    sys.path.append(os.path.dirname(script_path) + '/../pymanoid')
+    sys.path = [os.path.dirname(script_path) + '/../pymanoid'] + sys.path
     import pymanoid
-    from pymanoid.tasks import COMTask
+except:  # this is to avoid warning E402 from Pylint
+    pass
+
+from pymanoid.tasks import COMTask
 
 try:
     from wpg.cwc import compute_cwc_pyparma

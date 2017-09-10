@@ -26,19 +26,20 @@ import thread
 import threading
 import time
 
-try:
-    import pymanoid
-except ImportError:
-    script_path = os.path.realpath(__file__)
-    sys.path.append(os.path.dirname(script_path) + '/../pymanoid')
-    import pymanoid
-    from pymanoid.tasks import COMTask
+from warnings import warn
 
+try:  # use local pymanoid submodule
+    script_path = os.path.realpath(__file__)
+    sys.path = [os.path.dirname(script_path) + '/../pymanoid'] + sys.path
+    import pymanoid
+except:  # this is to avoid warning E402 from Pylint
+    pass
+
+from pymanoid.tasks import COMTask
 from polygon import compute_static_polygon_bretl
 from polygon import compute_static_polygon_cdd_hull
 from polygon import compute_static_polygon_pyparma_hull
 from polygon import compute_static_polygon_cdd_only
-from warnings import warn
 
 if os.path.isfile('HRP4R.dae'):
     from pymanoid.robots import HRP4 as RobotModel

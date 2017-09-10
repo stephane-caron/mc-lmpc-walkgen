@@ -21,12 +21,12 @@
 import cvxopt
 import cvxopt.solvers
 
+from StringIO import StringIO
 from numpy import array, cos, cross, pi, sin
 from numpy.random import random
 from pylab import double, hold, plot
 from scipy.linalg import norm
 from warnings import warn
-from StringIO import StringIO
 
 # STFU GLPK:
 cvxopt.solvers.options['show_progress'] = False

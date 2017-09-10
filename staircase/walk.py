@@ -28,12 +28,12 @@ import threading
 from numpy import arange, cos, hstack, pi, sin, zeros, array
 from numpy.random import random, seed
 
-try:
-    import pymanoid
-except ImportError:
+try:  # use local pymanoid submodule
     script_path = os.path.realpath(__file__)
-    sys.path.append(os.path.dirname(script_path) + '/../pymanoid')
+    sys.path = [os.path.dirname(script_path) + '/../pymanoid'] + sys.path
     import pymanoid
+except:  # this is to avoid warning E402 from Pylint
+    pass
 
 from pymanoid import Contact, PointMass
 from pymanoid import draw_line, draw_points, draw_force, draw_polygon
@@ -499,5 +499,6 @@ For example:
 Enjoy :)
 
 """
+    viewer.SetBkgndColor([.7, .7, .8])
     if IPython.get_ipython() is None:
         IPython.embed()

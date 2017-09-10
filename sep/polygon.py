@@ -22,12 +22,14 @@ import cdd
 import os.path
 import sys
 
-try:
-    import pymanoid
-except ImportError:
+from numpy import array, dot, hstack, vstack, zeros
+
+try:  # use local pymanoid submodule
     script_path = os.path.realpath(__file__)
-    sys.path.append(os.path.dirname(script_path) + '/../pymanoid')
+    sys.path = [os.path.dirname(script_path) + '/../pymanoid'] + sys.path
     import pymanoid
+except:  # this is to avoid warning E402 from Pylint
+    pass
 
 try:
     from wpg.cwc import compute_cwc_pyparma
@@ -38,7 +40,6 @@ except ImportError:
     from wpg.cwc import compute_cwc_pyparma
     from wpg.polygons import compute_polygon_hull
 
-from numpy import array, dot, hstack, vstack, zeros
 from projection import project_polytope_bretl
 
 
