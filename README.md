@@ -39,7 +39,7 @@ sudo pip install pycddlib quadprog pyclipper
 Then, clone the repository and its submodule via:
 
 ```bash
-git clone --recursive https://github.com/stephane-caron/3d-com-lmpc.git
+git clone --recursive https://github.com/stephane-caron/3d-walking-lmpc.git
 ```
 
 If you already have [pymanoid](https://github.com/stephane-caron/pymanoid)
