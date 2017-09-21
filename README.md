@@ -1,20 +1,20 @@
-# 3D-COM Predictive Control
+# 3D-CoM Linearized Predictive Control
 
 Source code for https://hal.archives-ouvertes.fr/hal-01349880
 
 ## Abstract
 
 We present a multi-contact walking pattern generator based on preview-control
-of the 3D acceleration of the center of mass (COM). A key point in the design
+of the 3D acceleration of the center of mass (CoM). A key point in the design
 of our algorithm is the calculation of contact-stability constraints. Thanks to
 a mathematical observation on the algebraic nature of the frictional wrench
-cone, we show that the 3D volume of feasible COM accelerations is a always a
+cone, we show that the 3D volume of feasible CoM accelerations is a always a
 downward-pointing cone. We reduce its computation to a convex hull of (dual) 2D
 points, for which optimal O(n log n) algorithms are readily available. This
 reformulation brings a significant speedup compared to previous methods, which
 allows us to compute time-varying contact-stability criteria fast enough for
 the control loop. Next, we propose a conservative trajectory-wide
-contact-stability criterion, which can be derived from COM-acceleration volumes
+contact-stability criterion, which can be derived from CoM-acceleration volumes
 at marginal cost and directly applied in a model-predictive controller. We
 finally implement this pipeline and exemplify it with the HRP-4 humanoid model
 in multi-contact dynamically walking scenarios.
@@ -39,7 +39,7 @@ sudo pip install pycddlib quadprog pyclipper
 Then, clone the repository and its submodule via:
 
 ```bash
-git clone --recursive https://github.com/stephane-caron/3d-com-mpc.git
+git clone --recursive https://github.com/stephane-caron/3d-com-lmpc.git
 ```
 
 If you already have [pymanoid](https://github.com/stephane-caron/pymanoid)
@@ -54,7 +54,7 @@ simulation.
 For a more detailed analysis, there are three subfolders in this repository,
 corresponding to different Sections of the paper:
 
-- *Section IV*: [cones/](cones/) contains scripts to display and play with the COM
+- *Section IV*: [cones/](cones/) contains scripts to display and play with the CoM
   acceleration cones
 - *Section VI*: [staircase/](staircase/) walks the humanoid model around a
   circular staircase with tilted stepping stones
