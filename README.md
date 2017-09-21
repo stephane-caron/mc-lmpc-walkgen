@@ -1,4 +1,4 @@
-# 3D Walking by Linearized Predictive Control
+# 3D Walking by Linearized Model Predictive Control
 
 Source code for https://hal.archives-ouvertes.fr/hal-01349880
 
