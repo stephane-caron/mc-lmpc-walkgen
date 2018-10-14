@@ -1,4 +1,4 @@
-# Multi-contact walking by linearized model predictive control
+# Multi-contact linearized model predictive control
 
 Source code for https://hal.archives-ouvertes.fr/hal-01349880/document
 
